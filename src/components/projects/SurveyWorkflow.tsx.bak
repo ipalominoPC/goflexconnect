@@ -1,0 +1,447 @@
+import { useState, useEffect } from 'react';
+import { Save, Upload, Trash2 } from 'lucide-react';
+import { supabase } from '../../services/supabaseClient';
+import { compressImage, getBase64SizeKB } from '../../utils/imageCompression';
+
+interface SurveyData {
+  id?: string;
+  ambient: {
+    rsrp: number | null;
+    rsrq: number | null;
+    sinr: number | null;
+    bandwidth: string;
+  };
+  indoor_speed: {
+    download: number | null;
+    upload: number | null;
+    ping: number | null;
+  };
+  outdoor_speed: {
+    download: number | null;
+    upload: number | null;
+    ping: number | null;
+  };
+  survey_photos: string[];
+  technician_name: string;
+  technician_phone: string;
+  project_location: string;
+  date_completed: string;
+}
+
+interface Props {
+  projectId: string;
+  userId: string;
+}
+
+export default function SurveyWorkflow({ projectId, userId }: Props) {
+  const [surveyData, setSurveyData] = useState<SurveyData>({
+    ambient: { rsrp: null, rsrq: null, sinr: null, bandwidth: '' },
+    indoor_speed: { download: null, upload: null, ping: null },
+    outdoor_speed: { download: null, upload: null, ping: null },
+    survey_photos: [],
+    technician_name: '',
+    technician_phone: '',
+    project_location: '',
+    date_completed: new Date().toISOString().split('T')[0],
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    loadSurveyData();
+  }, [projectId]);
+
+  const loadSurveyData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('survey_data')
+        .select('*')
+        .eq('project_id', projectId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        setSurveyData({
+          id: data.id,
+          ambient: data.ambient || { rsrp: null, rsrq: null, sinr: null, bandwidth: '' },
+          indoor_speed: data.indoor_speed || { download: null, upload: null, ping: null },
+          outdoor_speed: data.outdoor_speed || { download: null, upload: null, ping: null },
+          survey_photos: data.survey_photos || [],
+          technician_name: data.technician_name || '',
+          technician_phone: data.technician_phone || '',
+          project_location: data.project_location || '',
+          date_completed: data.date_completed || new Date().toISOString().split('T')[0],
+        });
+      }
+    } catch (error) {
+      console.error('Error loading survey data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const compressedPhotos = await Promise.all(
+        files.map(async (file) => {
+          const compressed = await compressImage(file);
+          const sizeKB = getBase64SizeKB(compressed);
+          console.log(`Compressed survey photo: ${sizeKB.toFixed(1)} KB`);
+          return compressed;
+        })
+      );
+      setSurveyData({
+        ...surveyData,
+        survey_photos: [...surveyData.survey_photos, ...compressedPhotos],
+      });
+    } catch (error) {
+      console.error('Error compressing photos:', error);
+      alert('Error processing photos. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        project_id: projectId,
+        user_id: userId,
+        ambient: surveyData.ambient,
+        indoor_speed: surveyData.indoor_speed,
+        outdoor_speed: surveyData.outdoor_speed,
+        survey_photos: surveyData.survey_photos,
+        technician_name: surveyData.technician_name,
+        technician_phone: surveyData.technician_phone,
+        project_location: surveyData.project_location,
+        date_completed: surveyData.date_completed,
+      };
+
+      if (surveyData.id) {
+        const { error } = await supabase
+          .from('survey_data')
+          .update(payload)
+          .eq('id', surveyData.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('survey_data')
+          .insert(payload)
+          .select()
+          .single();
+        if (error) throw error;
+        setSurveyData({ ...surveyData, id: data.id });
+      }
+
+      alert('Survey data saved successfully!');
+    } catch (error) {
+      console.error('Error saving survey data:', error);
+      alert('Error saving survey data. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-6">Loading survey data...</div>;
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Survey Workflow
+        </h2>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+        >
+          <Save className="w-5 h-5" />
+          {saving ? 'Saving...' : 'Save Survey'}
+        </button>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 space-y-6">
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            Ambient Readings
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                RSRP (dBm)
+              </label>
+              <input
+                type="number"
+                value={surveyData.ambient.rsrp || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  ambient: { ...surveyData.ambient, rsrp: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="-80"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                RSRQ (dB)
+              </label>
+              <input
+                type="number"
+                value={surveyData.ambient.rsrq || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  ambient: { ...surveyData.ambient, rsrq: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="-10"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                SINR (dB)
+              </label>
+              <input
+                type="number"
+                value={surveyData.ambient.sinr || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  ambient: { ...surveyData.ambient, sinr: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="15"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Bandwidth
+              </label>
+              <input
+                type="text"
+                value={surveyData.ambient.bandwidth}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  ambient: { ...surveyData.ambient, bandwidth: e.target.value }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="20 MHz"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            Indoor Speed Test
+          </h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Download (Mbps)
+              </label>
+              <input
+                type="number"
+                value={surveyData.indoor_speed.download || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  indoor_speed: { ...surveyData.indoor_speed, download: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="100"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Upload (Mbps)
+              </label>
+              <input
+                type="number"
+                value={surveyData.indoor_speed.upload || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  indoor_speed: { ...surveyData.indoor_speed, upload: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Ping (ms)
+              </label>
+              <input
+                type="number"
+                value={surveyData.indoor_speed.ping || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  indoor_speed: { ...surveyData.indoor_speed, ping: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="20"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            Outdoor Speed Test
+          </h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Download (Mbps)
+              </label>
+              <input
+                type="number"
+                value={surveyData.outdoor_speed.download || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  outdoor_speed: { ...surveyData.outdoor_speed, download: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="150"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Upload (Mbps)
+              </label>
+              <input
+                type="number"
+                value={surveyData.outdoor_speed.upload || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  outdoor_speed: { ...surveyData.outdoor_speed, upload: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="75"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Ping (ms)
+              </label>
+              <input
+                type="number"
+                value={surveyData.outdoor_speed.ping || ''}
+                onChange={(e) => setSurveyData({
+                  ...surveyData,
+                  outdoor_speed: { ...surveyData.outdoor_speed, ping: e.target.value ? parseFloat(e.target.value) : null }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="15"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            Survey Photos
+          </h3>
+          <div className="space-y-2">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoUpload}
+              className="hidden"
+              id="survey-photo-upload"
+              disabled={uploading}
+            />
+            <label
+              htmlFor="survey-photo-upload"
+              className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer transition-colors"
+            >
+              <Upload className="w-5 h-5" />
+              <span>{uploading ? 'Compressing...' : 'Upload Photos'}</span>
+            </label>
+            {surveyData.survey_photos.length > 0 && (
+              <div className="grid grid-cols-4 gap-2 mt-4">
+                {surveyData.survey_photos.map((photo, idx) => (
+                  <div key={idx} className="relative">
+                    <img src={photo} alt={`Survey ${idx + 1}`} className="w-full h-32 object-cover rounded" />
+                    <button
+                      type="button"
+                      onClick={() => setSurveyData({
+                        ...surveyData,
+                        survey_photos: surveyData.survey_photos.filter((_, i) => i !== idx)
+                      })}
+                      className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full hover:bg-red-700"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            Technician Information
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Technician Name
+              </label>
+              <input
+                type="text"
+                value={surveyData.technician_name}
+                onChange={(e) => setSurveyData({ ...surveyData, technician_name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="John Doe"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Phone (Optional)
+              </label>
+              <input
+                type="tel"
+                value={surveyData.technician_phone}
+                onChange={(e) => setSurveyData({ ...surveyData, technician_phone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Project Location
+              </label>
+              <input
+                type="text"
+                value={surveyData.project_location}
+                onChange={(e) => setSurveyData({ ...surveyData, project_location: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="123 Main St, City, State"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Date Completed
+              </label>
+              <input
+                type="date"
+                value={surveyData.date_completed}
+                onChange={(e) => setSurveyData({ ...surveyData, date_completed: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

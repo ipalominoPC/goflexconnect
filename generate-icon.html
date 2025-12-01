@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GoFlexConnect Icon Generator</title>
+</head>
+<body>
+    <h1>GoFlexConnect Icon Generator</h1>
+    <canvas id="icon512" width="512" height="512"></canvas>
+    <canvas id="icon32" width="32" height="32"></canvas>
+    <canvas id="icon16" width="16" height="16"></canvas>
+
+    <div style="margin-top: 20px;">
+        <button onclick="downloadIcon('icon512', 'goflex-icon.png')">Download 512x512</button>
+        <button onclick="downloadIcon('icon32', 'favicon-32x32.png')">Download 32x32</button>
+        <button onclick="downloadIcon('icon16', 'favicon-16x16.png')">Download 16x16</button>
+    </div>
+
+    <script>
+        function drawIcon(canvas) {
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+            const padding = size * 0.15;
+            const width = size - (padding * 2);
+            const height = size - (padding * 2);
+            const x = padding;
+            const y = padding;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+
+            // Cloud shape (rounded rectangle with extra curves)
+            const cloudRadius = width * 0.25;
+
+            // Create gradient for cloud
+            const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
+            gradient.addColorStop(0, '#06B4D7');
+            gradient.addColorStop(0.5, '#27AAE1');
+            gradient.addColorStop(1, '#0178B7');
+
+            // Draw cloud shape
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(x + cloudRadius, y);
+            ctx.lineTo(x + width - cloudRadius, y);
+            ctx.arcTo(x + width, y, x + width, y + cloudRadius, cloudRadius);
+            ctx.lineTo(x + width, y + height - cloudRadius);
+            ctx.arcTo(x + width, y + height, x + width - cloudRadius, y + height, cloudRadius);
+            ctx.lineTo(x + cloudRadius, y + height);
+            ctx.arcTo(x, y + height, x, y + height - cloudRadius, cloudRadius);
+            ctx.lineTo(x, y + cloudRadius);
+            ctx.arcTo(x, y, x + cloudRadius, y, cloudRadius);
+            ctx.closePath();
+            ctx.fill();
+
+            // Inner pill (horizontal rounded rectangle)
+            const pillWidth = width * 0.5;
+            const pillHeight = height * 0.15;
+            const pillX = x + (width - pillWidth) / 2;
+            const pillY = y + (height - pillHeight) / 2;
+            const pillRadius = pillHeight / 2;
+
+            ctx.fillStyle = '#1F2937';
+            ctx.beginPath();
+            ctx.moveTo(pillX + pillRadius, pillY);
+            ctx.lineTo(pillX + pillWidth - pillRadius, pillY);
+            ctx.arcTo(pillX + pillWidth, pillY, pillX + pillWidth, pillY + pillRadius, pillRadius);
+            ctx.lineTo(pillX + pillWidth, pillY + pillHeight - pillRadius);
+            ctx.arcTo(pillX + pillWidth, pillY + pillHeight, pillX + pillWidth - pillRadius, pillY + pillHeight, pillRadius);
+            ctx.lineTo(pillX + pillRadius, pillY + pillHeight);
+            ctx.arcTo(pillX, pillY + pillHeight, pillX, pillY + pillHeight - pillRadius, pillRadius);
+            ctx.lineTo(pillX, pillY + pillRadius);
+            ctx.arcTo(pillX, pillY, pillX + pillRadius, pillY, pillRadius);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Draw all sizes
+        drawIcon(document.getElementById('icon512'));
+        drawIcon(document.getElementById('icon32'));
+        drawIcon(document.getElementById('icon16'));
+
+        function downloadIcon(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    </script>
+</body>
+</html>

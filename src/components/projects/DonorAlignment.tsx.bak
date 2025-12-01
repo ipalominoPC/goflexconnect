@@ -1,0 +1,447 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Plus, Trash2, Upload, MapPin, Save } from 'lucide-react';
+import { supabase } from '../../services/supabaseClient';
+import { compressImage, getBase64SizeKB } from '../../utils/imageCompression';
+import { saveDraft, loadDraft, clearDraft, hasDraft, createDebouncedSave } from '../../services/formAutosaveService';
+import { useStore } from '../../store/useStore';
+
+interface DonorAlignment {
+  id: string;
+  carrier: 'VERIZON' | 'ATT' | 'TMOBILE';
+  azimuth: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  notes: string;
+  photos: string[];
+  created_at: string;
+}
+
+interface Props {
+  projectId: string;
+  userId: string;
+}
+
+export default function DonorAlignment({ projectId, userId }: Props) {
+  const [alignments, setAlignments] = useState<DonorAlignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formData, setFormData] = useState({
+    carrier: 'VERIZON' as 'VERIZON' | 'ATT' | 'TMOBILE',
+    azimuth: '',
+    notes: '',
+  });
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [showRestoreDraft, setShowRestoreDraft] = useState(false);
+  const settings = useStore((state) => state.settings);
+  const autosaveEnabled = settings.autosaveEnabled !== false;
+  const debouncedSaveRef = useRef<((data: any) => void) | null>(null);
+
+  const formKey = `donor_alignment:${projectId}`;
+
+  // Initialize autosave
+  useEffect(() => {
+    if (autosaveEnabled) {
+      debouncedSaveRef.current = createDebouncedSave((data: any) => {
+        saveDraft(formKey, data);
+      }, 2000);
+    }
+  }, [autosaveEnabled, formKey]);
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    if (autosaveEnabled && hasDraft(formKey) && showAddForm) {
+      setShowRestoreDraft(true);
+    }
+  }, [autosaveEnabled, formKey, showAddForm]);
+
+  // Autosave form data when it changes
+  useEffect(() => {
+    if (autosaveEnabled && showAddForm && debouncedSaveRef.current) {
+      const draftData = { formData, photos };
+      debouncedSaveRef.current(draftData);
+    }
+  }, [formData, photos, autosaveEnabled, showAddForm]);
+
+  useEffect(() => {
+    loadAlignments();
+  }, [projectId]);
+
+  const loadAlignments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('donor_alignment')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAlignments(data || []);
+    } catch (error) {
+      console.error('Error loading donor alignments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const captureLocation = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          alert(`Location captured: ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          alert('Unable to get location. Please ensure location permissions are enabled.');
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser.');
+    }
+  };
+
+  const restoreDraft = () => {
+    const draft = loadDraft(formKey);
+    if (draft) {
+      if (draft.formData) {
+        setFormData(draft.formData);
+      }
+      if (draft.photos) {
+        setPhotos(draft.photos);
+      }
+    }
+    setShowRestoreDraft(false);
+  };
+
+  const discardDraft = () => {
+    clearDraft(formKey);
+    setShowRestoreDraft(false);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const compressedPhotos = await Promise.all(
+        files.map(async (file) => {
+          const compressed = await compressImage(file);
+          const sizeKB = getBase64SizeKB(compressed);
+          console.log(`Compressed image: ${sizeKB.toFixed(1)} KB`);
+          return compressed;
+        })
+      );
+      setPhotos([...photos, ...compressedPhotos]);
+    } catch (error) {
+      console.error('Error compressing photos:', error);
+      alert('Error processing photos. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const azimuth = parseInt(formData.azimuth);
+    if (isNaN(azimuth) || azimuth < 0 || azimuth > 359) {
+      alert('Azimuth must be between 0 and 359 degrees');
+      return;
+    }
+
+    try {
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+
+      if ('geolocation' in navigator) {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+      }
+
+      const { error } = await supabase.from('donor_alignment').insert({
+        project_id: projectId,
+        user_id: userId,
+        carrier: formData.carrier,
+        azimuth,
+        latitude,
+        longitude,
+        notes: formData.notes,
+        photos: photos,
+      });
+
+      if (error) throw error;
+
+      // Clear draft after successful save
+      if (autosaveEnabled) {
+        clearDraft(formKey);
+      }
+
+      setFormData({ carrier: 'VERIZON', azimuth: '', notes: '' });
+      setPhotos([]);
+      setShowAddForm(false);
+      loadAlignments();
+
+      alert('Donor alignment saved successfully!');
+    } catch (error) {
+      console.error('Error saving donor alignment:', error);
+      alert('Error saving donor alignment. Please try again.');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this donor alignment?')) return;
+
+    try {
+      const { error } = await supabase.from('donor_alignment').delete().eq('id', id);
+      if (error) throw error;
+      loadAlignments();
+    } catch (error) {
+      console.error('Error deleting donor alignment:', error);
+      alert('Error deleting donor alignment.');
+    }
+  };
+
+  const getCarrierColor = (carrier: string) => {
+    switch (carrier) {
+      case 'VERIZON': return 'text-red-600 bg-red-50 dark:bg-red-900/20';
+      case 'ATT': return 'text-blue-600 bg-blue-50 dark:bg-blue-900/20';
+      case 'TMOBILE': return 'text-pink-600 bg-pink-50 dark:bg-pink-900/20';
+      default: return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20';
+    }
+  };
+
+  if (loading) {
+    return <div className="p-6">Loading donor alignments...</div>;
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Donor Alignment
+        </h2>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          Add Donor
+        </button>
+      </div>
+
+      {showAddForm && (
+        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg p-6 space-y-4 border border-gray-200 dark:border-gray-700">
+          {showRestoreDraft && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <Save className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Unsaved changes found
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                    We found unsaved changes from a previous session. Would you like to restore them?
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={restoreDraft}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      type="button"
+                      onClick={discardDraft}
+                      className="px-3 py-1.5 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 text-sm rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Carrier
+            </label>
+            <select
+              value={formData.carrier}
+              onChange={(e) => setFormData({ ...formData, carrier: e.target.value as any })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="VERIZON">Verizon</option>
+              <option value="ATT">AT&T</option>
+              <option value="TMOBILE">T-Mobile</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Azimuth (0-359°)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="359"
+              value={formData.azimuth}
+              onChange={(e) => setFormData({ ...formData, azimuth: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="Enter azimuth"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              rows={3}
+              placeholder="Alignment notes..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Alignment Photos (Octopus screenshots, etc.)
+            </label>
+            <div className="space-y-2">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handlePhotoUpload}
+                className="hidden"
+                id="photo-upload"
+                disabled={uploading}
+              />
+              <label
+                htmlFor="photo-upload"
+                className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer transition-colors"
+              >
+                <Upload className="w-5 h-5" />
+                <span>{uploading ? 'Compressing...' : 'Upload Photos'}</span>
+              </label>
+              {photos.length > 0 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {photos.map((photo, idx) => (
+                    <div key={idx} className="relative">
+                      <img src={photo} alt={`Photo ${idx + 1}`} className="w-full h-24 object-cover rounded" />
+                      <button
+                        type="button"
+                        onClick={() => setPhotos(photos.filter((_, i) => i !== idx))}
+                        className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full hover:bg-red-700"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={captureLocation}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <MapPin className="w-5 h-5" />
+              Capture Location
+            </button>
+            <span className="text-sm text-gray-500">Location will be auto-captured on save</span>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Save Donor Alignment
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddForm(false);
+                setFormData({ carrier: 'VERIZON', azimuth: '', notes: '' });
+                setPhotos([]);
+              }}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {alignments.length === 0 ? (
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+          No donor alignments yet. Click "Add Donor" to get started.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {alignments.map((alignment) => (
+            <div key={alignment.id} className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getCarrierColor(alignment.carrier)}`}>
+                    {alignment.carrier === 'ATT' ? 'AT&T' : alignment.carrier.charAt(0) + alignment.carrier.slice(1).toLowerCase()}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      Azimuth: {alignment.azimuth}°
+                    </p>
+                    {alignment.latitude && alignment.longitude && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {alignment.latitude.toFixed(6)}, {alignment.longitude.toFixed(6)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDelete(alignment.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+
+              {alignment.notes && (
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">{alignment.notes}</p>
+              )}
+
+              {alignment.photos.length > 0 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {alignment.photos.map((photo, idx) => (
+                    <img
+                      key={idx}
+                      src={photo}
+                      alt={`Alignment ${idx + 1}`}
+                      className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => window.open(photo, '_blank')}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">
+                {new Date(alignment.created_at).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
