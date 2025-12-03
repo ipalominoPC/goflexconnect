@@ -127,7 +127,13 @@ export default function Settings({ onBack, onShowDiagnostics }: SettingsProps) {
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Logout failed:', error);
+    } finally {
+      window.location.href = '/';
     }
+
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 1000);
   };
 
   return (

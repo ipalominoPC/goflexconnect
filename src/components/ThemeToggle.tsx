@@ -1,26 +1,49 @@
-import { Moon, Sun } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
+import { Moon, Sun, Monitor } from 'lucide-react';
+import { useTheme } from '../theme/ThemeProvider';
 
 export default function ThemeToggle() {
-  const { theme, toggleTheme } = useTheme();
+  const { themeMode, effectiveTheme, setThemeMode } = useTheme();
 
   return (
-    <button
-      onClick={toggleTheme}
-      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all bg-slate-800/80 text-slate-100 border border-slate-700 hover:bg-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 light:bg-slate-100 light:text-slate-900 light:border-slate-300 light:hover:bg-slate-200"
-      title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-    >
-      {theme === 'dark' ? (
-        <>
-          <Moon className="w-4 h-4" />
-          <span className="hidden sm:inline">Dark</span>
-        </>
-      ) : (
-        <>
-          <Sun className="w-4 h-4" />
-          <span className="hidden sm:inline">Light</span>
-        </>
-      )}
-    </button>
+    <div className="inline-flex items-center rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 p-1 transition-colors duration-300">
+      <button
+        onClick={() => setThemeMode('light')}
+        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+          themeMode === 'light'
+            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+        }`}
+        title="Light theme"
+      >
+        <Sun className="w-4 h-4" />
+        <span className="hidden sm:inline">Light</span>
+      </button>
+
+      <button
+        onClick={() => setThemeMode('dark')}
+        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+          themeMode === 'dark'
+            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+        }`}
+        title="Dark theme"
+      >
+        <Moon className="w-4 h-4" />
+        <span className="hidden sm:inline">Dark</span>
+      </button>
+
+      <button
+        onClick={() => setThemeMode('system')}
+        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+          themeMode === 'system'
+            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+        }`}
+        title="Follow system preference"
+      >
+        <Monitor className="w-4 h-4" />
+        <span className="hidden sm:inline">System</span>
+      </button>
+    </div>
   );
 }

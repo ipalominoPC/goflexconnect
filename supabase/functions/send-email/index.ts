@@ -8,6 +8,8 @@ const corsHeaders = {
 
 interface EmailRequest {
   to: string | string[];
+  cc?: string | string[];
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
@@ -22,7 +24,13 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { to, subject, html, text }: EmailRequest = await req.json();
+    const { to, cc, replyTo, subject, html, text }: EmailRequest = await req.json();
+
+    console.log('[send-email] Received request');
+    console.log('[send-email] To:', to);
+    console.log('[send-email] CC:', cc);
+    console.log('[send-email] Subject:', subject);
+    console.log('[send-email] HTML length:', html?.length || 0);
 
     if (!to || !subject || !html) {
       return new Response(
@@ -34,10 +42,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Normalize recipients to array
-    const recipients = Array.isArray(to) ? to : [to];
+    // Normalize recipients to arrays
+    const toRecipients = Array.isArray(to) ? to : [to];
+    const ccRecipients = cc ? (Array.isArray(cc) ? cc : [cc]) : [];
+    const allRecipients = [...toRecipients, ...ccRecipients];
 
-    if (recipients.length === 0) {
+    if (allRecipients.length === 0) {
       return new Response(
         JSON.stringify({ error: "No recipients specified" }),
         {
@@ -50,8 +60,10 @@ Deno.serve(async (req: Request) => {
     // SMTP credentials
     const smtpHost = "smtp.ionos.com";
     const smtpPort = 587;
-    const smtpUser = "forgot@goflexconnect.com";
-    const smtpPass = "El3m3nt@lg33k@3050";
+    const smtpUser = "support@goflexconnect.com";
+    const smtpPass = "El3m3nt&149@3050";
+
+    console.log('[send-email] SMTP config:', { host: smtpHost, port: smtpPort, user: smtpUser });
 
     // Validate SMTP credentials exist
     if (!smtpUser || !smtpPass) {
@@ -124,21 +136,36 @@ Deno.serve(async (req: Request) => {
       // Send email to all recipients
       await sendTlsCommand(`MAIL FROM:<${smtpUser}>`);
 
-      // Add all recipients
-      for (const recipient of recipients) {
+      // Add all recipients (to and cc)
+      for (const recipient of allRecipients) {
         await sendTlsCommand(`RCPT TO:<${recipient}>`);
       }
 
       await sendTlsCommand("DATA");
 
-      // Build email with all recipients in To header
-      const emailContent = [
-        `From: GoFlex Connect <${smtpUser}>`,
-        `To: ${recipients.join(", ")}`,
+      // Build email with separate To, CC, and Reply-To headers
+      const emailHeaders = [
+        `From: GoFlexConnect Support <${smtpUser}>`,
+        `To: ${toRecipients.join(", ")}`,
+      ];
+
+      if (ccRecipients.length > 0) {
+        emailHeaders.push(`Cc: ${ccRecipients.join(", ")}`);
+      }
+
+      if (replyTo) {
+        emailHeaders.push(`Reply-To: ${replyTo}`);
+      }
+
+      emailHeaders.push(
         `Subject: ${subject}`,
         "MIME-Version: 1.0",
         "Content-Type: text/html; charset=utf-8",
-        "",
+        ""
+      );
+
+      const emailContent = [
+        ...emailHeaders,
         html,
         ".",
       ].join("\r\n");
@@ -149,7 +176,9 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: `Email sent successfully to ${recipients.length} recipient(s)`
+          message: `Email sent successfully to ${allRecipients.length} recipient(s)`,
+          to: toRecipients.length,
+          cc: ccRecipients.length
         }),
         {
           status: 200,

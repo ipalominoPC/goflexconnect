@@ -1,10 +1,23 @@
+import { useEffect } from 'react';
 import { CheckCircle, Globe, Mail, ArrowLeft } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface ThankYouPageProps {
   onBackToApp: () => void;
 }
 
 export default function ThankYouPage({ onBackToApp }: ThankYouPageProps) {
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      await supabase.auth.signOut();
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 200);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="min-h-screen bg-goflex-bg flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-8">

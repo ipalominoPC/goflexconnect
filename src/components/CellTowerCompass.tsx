@@ -106,22 +106,21 @@ export default function CellTowerCompass({ onBack }: CellTowerCompassProps) {
   const relativeBearing = selected ? (selected.bearing - heading + 360) % 360 : 0;
 
   return (
-    <div className="min-h-screen bg-goflex-bg">
-      <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8">
         <button
           onClick={onBack}
-          className="mb-6 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+          className="mb-6 flex items-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
           Back
         </button>
 
         <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-8 mb-6 transition-colors duration-300 ease-in-out">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Cell Tower Compass</h1>
-                <p className="text-gray-600">Real cell tower locations from OpenCelliD</p>
+                <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Cell Tower Compass</h1>
+                <p className="text-slate-600 dark:text-slate-400">Real cell tower locations from OpenCelliD</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -277,8 +276,8 @@ export default function CellTowerCompass({ onBack }: CellTowerCompassProps) {
           </div>
 
           {towers.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-8 transition-colors duration-300 ease-in-out">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                 Nearby Cell Towers ({towers.length})
               </h2>
               <div className="space-y-4">
@@ -288,8 +287,8 @@ export default function CellTowerCompass({ onBack }: CellTowerCompassProps) {
                     onClick={() => setSelectedTower(tower.cellId)}
                     className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
                       selectedTower === tower.cellId
-                        ? 'border-cyan-500 bg-cyan-50'
-                        : 'border-gray-200 hover:border-cyan-300'
+                        ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-cyan-300'
                     }`}
                   >
                     <div className="flex items-start justify-between mb-3">
@@ -351,6 +350,5 @@ export default function CellTowerCompass({ onBack }: CellTowerCompassProps) {
           )}
         </div>
       </div>
-    </div>
   );
 }

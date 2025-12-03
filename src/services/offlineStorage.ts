@@ -173,6 +173,17 @@ class OfflineStorage {
     });
   }
 
+  async getAllFloors(): Promise<Floor[]> {
+    if (!this.db) await this.init();
+    const tx = this.db!.transaction([FLOORS_STORE], 'readonly');
+    const store = tx.objectStore(FLOORS_STORE);
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   async deleteFloor(id: string): Promise<void> {
     if (!this.db) await this.init();
     const tx = this.db!.transaction([FLOORS_STORE, MEASUREMENTS_STORE], 'readwrite');
@@ -212,6 +223,17 @@ class OfflineStorage {
     const index = store.index('projectId');
     return new Promise((resolve, reject) => {
       const request = index.getAll(projectId);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllMeasurements(): Promise<Measurement[]> {
+    if (!this.db) await this.init();
+    const tx = this.db!.transaction([MEASUREMENTS_STORE], 'readonly');
+    const store = tx.objectStore(MEASUREMENTS_STORE);
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Gauge, Download, Upload, Activity, Signal, MapPin, Globe, Wifi, AlertTriangle, Smartphone, Info, CheckCircle } from 'lucide-react';
-import { runSpeedTest, getCellularNetworkInfo, SpeedTestProgress, getNetworkContext, getConnectionLabel, NetworkContext } from '../utils/networkUtils';
+import { runSpeedTest, getCellularNetworkInfo, SpeedTestProgress, getNetworkContext, getConnectionLabel, NetworkContext, formatConnectionMetrics } from '../utils/networkUtils';
 import { SpeedTestResult } from '../types';
 import { getCompleteLocation, LocationData } from '../services/locationService';
 import VpnWarning from './VpnWarning';
@@ -215,10 +215,10 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
 
   if (isCheckingLocation) {
     return (
-      <div className="min-h-screen bg-goflex-bg flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[80vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-goflex-blue mx-auto mb-4"></div>
-          <p className="text-slate-600">Checking location and network...</p>
+          <p className="text-slate-600 dark:text-slate-400">Checking location and network...</p>
         </div>
       </div>
     );
@@ -237,12 +237,12 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
         />
       )}
 
-      <div className="min-h-screen bg-goflex-bg">
+      <div>
       <div className="container mx-auto px-4 py-6">
         <button
           onClick={onBack}
           disabled={isRunning}
-          className="flex items-center gap-2 text-slate-700 hover:text-slate-900 mb-6 disabled:opacity-50"
+          className="flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white mb-6 disabled:opacity-50"
         >
           <ArrowLeft className="w-5 h-5" />
           <span className="font-medium">Back</span>
@@ -253,7 +253,7 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl mb-4">
               <Gauge className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white dark:text-white mb-2">Speed Test</h1>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Speed Test</h1>
 
             {detectedNetwork && (
               <>
@@ -306,15 +306,15 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
           </div>
 
           {detectedNetwork && (
-            <div className="bg-goflex-card border border-slate-700 rounded-2xl shadow-lg p-6 mb-6">
-              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-6 mb-6">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                 <Info className="w-5 h-5 text-goflex-blue" />
                 Network Context
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="p-3 bg-slate-800/50 rounded-lg">
-                  <div className="text-xs text-slate-400 mb-1">Detected Connection</div>
-                  <div className="text-sm font-semibold text-white flex items-center gap-2">
+                <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+                  <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Detected Connection</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                     {detectedNetwork.connectionType === 'cellular' ? (
                       <Smartphone className="w-4 h-4 text-emerald-400" />
                     ) : detectedNetwork.connectionType === 'wifi' ? (
@@ -326,19 +326,19 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
                      detectedNetwork.connectionType === 'cellular' ? 'Cellular' : 'Unknown'}
                   </div>
                 </div>
-                <div className="p-3 bg-slate-800/50 rounded-lg">
-                  <div className="text-xs text-slate-400 mb-1">Effective Type</div>
-                  <div className="text-sm font-semibold text-white">
+                <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+                  <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Effective Type</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
                     {detectedNetwork.effectiveType ? detectedNetwork.effectiveType.toUpperCase() : 'Unknown'}
                   </div>
                 </div>
-                <div className="p-3 bg-slate-800/50 rounded-lg">
-                  <div className="text-xs text-slate-400 mb-1">Device</div>
-                  <div className="text-sm font-semibold text-white">{detectedNetwork.deviceSummary}</div>
+                <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+                  <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Device</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">{detectedNetwork.deviceSummary}</div>
                 </div>
-                <div className="p-3 bg-slate-800/50 rounded-lg">
-                  <div className="text-xs text-slate-400 mb-1">Downlink / RTT</div>
-                  <div className="text-sm font-semibold text-white">
+                <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+                  <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Downlink / RTT</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
                     {detectedNetwork.downlink ? `${detectedNetwork.downlink.toFixed(1)} Mbps` : 'N/A'} / {detectedNetwork.rtt ? `${detectedNetwork.rtt}ms` : 'N/A'}
                   </div>
                 </div>
@@ -363,8 +363,8 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
               )}
 
               {detectedNetwork.connectionType === 'unknown' && (
-                <div className="p-4 bg-slate-700/50 border border-slate-600 rounded-lg mb-4">
-                  <p className="text-sm text-slate-300 flex items-start gap-2">
+                <div className="p-4 bg-slate-100 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 rounded-lg mb-4">
+                  <p className="text-sm text-slate-700 dark:text-slate-300 flex items-start gap-2">
                     <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <span>Cannot detect network type. For best RF coverage data, use cellular (4G/LTE/5G). Optional inputs below help improve accuracy.</span>
                   </p>
@@ -373,13 +373,13 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Network Type (Optional)
                   </label>
                   <select
                     value={manualNetworkType}
                     onChange={(e) => setManualNetworkType(e.target.value)}
-                    className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-goflex-blue focus:ring-1 focus:ring-goflex-blue transition-colors"
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:border-goflex-blue focus:ring-1 focus:ring-goflex-blue transition-colors"
                   >
                     <option value="auto">Auto-detected</option>
                     <option value="5G">5G</option>
@@ -390,7 +390,7 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Carrier/Operator (Optional)
                   </label>
                   <input
@@ -398,55 +398,62 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
                     value={carrierName}
                     onChange={(e) => setCarrierName(e.target.value)}
                     placeholder="e.g., Verizon, T-Mobile"
-                    className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:border-goflex-blue focus:ring-1 focus:ring-goflex-blue transition-colors"
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-goflex-blue focus:ring-1 focus:ring-goflex-blue transition-colors"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          <div className="bg-white dark:bg-goflex-card rounded-2xl shadow-lg p-8 mb-6">
-            <div className="text-center mb-8">
-              <div className="relative w-48 h-48 mx-auto mb-6">
-                <svg className="transform -rotate-90 w-48 h-48">
-                  <circle
-                    cx="96"
-                    cy="96"
-                    r="88"
-                    stroke="#e2e8f0"
-                    strokeWidth="12"
-                    fill="none"
-                  />
-                  <circle
-                    cx="96"
-                    cy="96"
-                    r="88"
-                    stroke="#10b981"
-                    strokeWidth="12"
-                    fill="none"
-                    strokeDasharray={`${2 * Math.PI * 88}`}
-                    strokeDashoffset={`${2 * Math.PI * 88 * (1 - progress.progress / 100)}`}
-                    strokeLinecap="round"
-                    className="transition-all duration-300"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-4xl font-bold text-slate-900">
-                    {Math.round(progress.progress)}%
-                  </span>
-                  <span className="text-sm text-slate-600 mt-1">
-                    {getPhaseText()}
-                  </span>
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-8 mb-6">
+            <div className="mb-8">
+              <div className="flex w-full justify-center mb-6">
+                <div className="relative aspect-square w-48 max-w-[192px]">
+                  <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 200 200">
+                    <circle
+                      cx="100"
+                      cy="100"
+                      r="90"
+                      stroke="#e2e8f0"
+                      strokeWidth="12"
+                      fill="none"
+                    />
+                    <circle
+                      cx="100"
+                      cy="100"
+                      r="90"
+                      stroke="#10b981"
+                      strokeWidth="12"
+                      fill="none"
+                      strokeDasharray={`${2 * Math.PI * 90}`}
+                      strokeDashoffset={`${2 * Math.PI * 90 * (1 - progress.progress / 100)}`}
+                      strokeLinecap="round"
+                      className="transition-all duration-300"
+                    />
+                  </svg>
+
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-4xl font-bold leading-none text-slate-900 dark:text-white">
+                        {Math.round(progress.progress)}%
+                      </div>
+                      <div className="text-sm text-slate-600 dark:text-slate-300 leading-tight mt-1">
+                        {progress.phase === 'complete' ? 'Test complete!' : 'Testing...'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <button
-                onClick={handleStartTest}
-                disabled={isRunning}
-                className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
-              >
-                {isRunning ? 'Testing...' : 'Start Test'}
-              </button>
+              <div className="flex w-full justify-center">
+                <button
+                  onClick={handleStartTest}
+                  disabled={isRunning}
+                  className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+                >
+                  {isRunning ? 'Testing...' : 'Start Test'}
+                </button>
+              </div>
 
               {limitError && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -496,124 +503,156 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
             )}
           </div>
 
-          {result && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                  <Signal className="w-5 h-5 text-emerald-500" />
-                  Network Information
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">Provider</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.provider}</div>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">Connection Type</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.connectionType}</div>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">Frequency</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.frequency} MHz</div>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">Band</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.band}</div>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">Cell ID</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.cellId}</div>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">Jitter</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.jitter} ms</div>
+          {result && (() => {
+            const isWifi = detectedNetwork?.connectionType === 'wifi';
+            const isCellular = detectedNetwork?.connectionType === 'cellular';
+
+            return (
+              <div className="space-y-6">
+                <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-6">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Signal className="w-5 h-5 text-emerald-500" />
+                    Network Information
+                  </h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">
+                        {isWifi ? 'ISP / Network' : 'Provider'}
+                      </div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {isWifi ? (result.isp || result.organization || 'Wi-Fi Network') : result.provider}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Connection Type</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {isWifi ? 'Wi-Fi' : result.connectionType}
+                      </div>
+                    </div>
+                    {!isWifi && (
+                      <>
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Frequency</div>
+                          <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.frequency} MHz</div>
+                        </div>
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Band</div>
+                          <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.band}</div>
+                        </div>
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Cell ID</div>
+                          <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.cellId}</div>
+                        </div>
+                      </>
+                    )}
+                    {result.jitter !== undefined && (
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Jitter</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.jitter} ms</div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-blue-500" />
-                  Cellular Metrics
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">RSRP</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.rsrp.toFixed(1)} dBm</div>
+                {isCellular && (
+                  <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-6">
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-blue-500" />
+                      Cellular RF Metrics
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">RSRP</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.rsrp.toFixed(1)} dBm</div>
+                      </div>
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">RSRQ</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.rsrq.toFixed(1)} dB</div>
+                      </div>
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">SINR</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.sinr.toFixed(1)} dB</div>
+                      </div>
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">RSSI</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.rssi.toFixed(1)} dBm</div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">RSRQ</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.rsrq.toFixed(1)} dB</div>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">SINR</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.sinr.toFixed(1)} dB</div>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 mb-1">RSSI</div>
-                    <div className="text-sm font-semibold text-slate-900">{result.rssi.toFixed(1)} dBm</div>
-                  </div>
-                </div>
-              </div>
+                )}
 
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-6">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                   <Globe className="w-5 h-5 text-blue-500" />
                   IP &amp; Network Details
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {result.ipAddress && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">IPv4 Address</div>
-                      <div className="text-sm font-semibold text-slate-900">{result.ipAddress}</div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">IPv4 Address</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.ipAddress}</div>
                     </div>
                   )}
                   {result.ipv6Address && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">IPv6 Address</div>
-                      <div className="text-sm font-semibold text-slate-900 break-all">{result.ipv6Address}</div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">IPv6 Address</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white break-all">{result.ipv6Address}</div>
                     </div>
                   )}
                   {result.isp && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">Internet Service Provider</div>
-                      <div className="text-sm font-semibold text-slate-900">{result.isp}</div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Internet Service Provider</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.isp}</div>
                     </div>
                   )}
                   {result.organization && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">Organization</div>
-                      <div className="text-sm font-semibold text-slate-900">{result.organization}</div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Organization</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.organization}</div>
                     </div>
                   )}
                   {result.asn && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">ASN</div>
-                      <div className="text-sm font-semibold text-slate-900">{result.asn}</div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">ASN</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.asn}</div>
                     </div>
                   )}
                   {result.ipCity && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">Location</div>
-                      <div className="text-sm font-semibold text-slate-900">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Location</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
                         {result.ipCity}, {result.ipRegion}, {result.ipCountry}
                       </div>
                     </div>
                   )}
-                  {result.connectionType && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">Connection Type</div>
-                      <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                        <Wifi className="w-4 h-4" />
-                        {result.connectionType}
+                  {detectedNetwork && (
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Connection Type</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        {detectedNetwork.connectionType === 'cellular' ? (
+                          <Smartphone className="w-4 h-4" />
+                        ) : detectedNetwork.connectionType === 'wifi' ? (
+                          <Wifi className="w-4 h-4" />
+                        ) : (
+                          <Activity className="w-4 h-4" />
+                        )}
+                        {detectedNetwork.connectionType === 'wifi' ? 'Wi-Fi' :
+                         detectedNetwork.connectionType === 'cellular' ? 'Cellular' : 'Unknown'}
+                        {detectedNetwork.connectionType === 'cellular' && detectedNetwork.effectiveType && ` (${detectedNetwork.effectiveType.toUpperCase()})`}
                       </div>
                     </div>
                   )}
-                  {result.dnsServers && result.dnsServers.length > 0 && (
-                    <div className="p-3 bg-slate-50 rounded-lg col-span-full">
-                      <div className="text-xs text-slate-600 mb-1">Connection Metrics</div>
-                      <div className="text-sm font-semibold text-slate-900">
-                        {result.dnsServers.join(' • ')}
+                  {detectedNetwork && detectedNetwork.connectionType && (
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Connection Metrics</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {formatConnectionMetrics({
+                          detectedConnection: detectedNetwork.connectionType,
+                          cellularType: detectedNetwork.effectiveType?.toUpperCase(),
+                          downloadMbps: result.downloadSpeed,
+                          uploadMbps: result.uploadSpeed,
+                          latencyMs: result.ping,
+                        })}
                       </div>
                     </div>
                   )}
@@ -621,31 +660,32 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
               </div>
 
               {result.latitude && result.longitude && (
-                <div className="bg-white rounded-2xl shadow-lg p-6">
-                  <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-6">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-red-500" />
                     GPS Location
                   </h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">Latitude</div>
-                      <div className="text-sm font-semibold text-slate-900">{result.latitude.toFixed(6)}</div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Latitude</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.latitude.toFixed(6)}</div>
                     </div>
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="text-xs text-slate-600 mb-1">Longitude</div>
-                      <div className="text-sm font-semibold text-slate-900">{result.longitude.toFixed(6)}</div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Longitude</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.longitude.toFixed(6)}</div>
                     </div>
                     {result.gpsAccuracy && (
-                      <div className="p-3 bg-slate-50 rounded-lg">
-                        <div className="text-xs text-slate-600 mb-1">Accuracy</div>
-                        <div className="text-sm font-semibold text-slate-900">{result.gpsAccuracy.toFixed(0)}m</div>
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Accuracy</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{result.gpsAccuracy.toFixed(0)}m</div>
                       </div>
                     )}
                   </div>
                 </div>
               )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </div>
 
         <AdSlot placement="speedtest-banner" />
@@ -653,13 +693,13 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
 
       {showWifiModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-goflex-card border border-slate-700 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
             <div className="text-center mb-6">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-500/20 rounded-full mb-4">
                 <Wifi className="w-8 h-8 text-amber-400" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Best results on cellular</h2>
-              <p className="text-slate-300 leading-relaxed">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Best results on cellular</h2>
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
                 For the most accurate RF coverage data, we recommend running this test while connected to your cellular network (4G/LTE/5G) instead of Wi-Fi. You can switch to cellular now, or continue on Wi-Fi and we'll still record the results.
               </p>
             </div>
@@ -669,7 +709,7 @@ export default function SpeedTest({ onBack, onSaveResult }: SpeedTestProps) {
                 onClick={() => {
                   setShowWifiModal(false);
                 }}
-                className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-colors"
+                className="w-full px-6 py-3 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white font-semibold rounded-xl transition-colors"
               >
                 Switch to Cellular
               </button>

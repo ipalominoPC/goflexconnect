@@ -33,8 +33,9 @@
  *    - Check console for test results
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
+import MobileBottomNav from './components/MobileBottomNav';
 import { useStore } from './store/useStore';
 import { supabase } from './services/supabaseClient';
 import { offlineStorage } from './services/offlineStorage';
@@ -73,12 +74,15 @@ import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import AdminDashboard from './pages/AdminDashboard';
 import SelfTestConsole from './pages/SelfTestConsole';
+import TestSupportSystem from './pages/TestSupportSystem';
 import AdminRouteGuard from './components/AdminRouteGuard';
 import { Landing } from './pages/Landing';
+import MyTickets from './components/MyTickets';
 import FloorHeatmapPage from './pages/FloorHeatmapPage';
 import SurveyReportPage from './pages/SurveyReportPage';
 import InstallReportPage from './pages/InstallReportPage';
 import { saveSpeedTest } from './services/supabaseClient';
+import AppLayout from './components/AppLayout';
 
 type View =
   | { type: 'landing' }
@@ -109,7 +113,9 @@ type View =
   | { type: 'analytics' }
   | { type: 'reports' }
   | { type: 'admin' }
+  | { type: 'myTickets' }
   | { type: 'selfTest' }
+  | { type: 'testSupport' }
   | { type: 'settings' }
   | { type: 'diagnostics' }
   | { type: 'thankYou' }
@@ -123,6 +129,7 @@ function App() {
   const hasCompletedOnboarding = useStore((state) => state.hasCompletedOnboarding);
   const [currentView, setCurrentView] = useState<View>({ type: 'landing' });
   const [authChecked, setAuthChecked] = useState(false);
+  const onboardingNavigatedRef = useRef(false);
 
   // Inactivity timer configuration
   const sessionTimeoutMs = (settings.sessionTimeoutMinutes || 30) * 60 * 1000;
@@ -137,80 +144,123 @@ function App() {
     onLogout: async () => {
       console.log('[Inactivity] Auto-logout due to inactivity');
       await supabase.auth.signOut();
-      setCurrentView({ type: 'auth' });
+      window.location.href = '/';
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
     },
     enabled: !!user, // Only enable when user is logged in
   });
 
   useEffect(() => {
-    offlineStorage.init().then(() => {
-      offlineStorage.clearAllPendingSync();
-    });
+    let isMounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setAuthChecked(true);
-      if (session?.user) {
-        syncService.loadDataFromServer();
+    async function initializeApp() {
+      try {
+        await offlineStorage.init();
+        await offlineStorage.clearAllPendingSync();
+      } catch (error) {
+        console.error('[App] Failed to init offline storage:', error);
       }
-    });
+
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('[App] Failed to get session:', error);
+        }
+
+        if (isMounted) {
+          setUser(session?.user ?? null);
+          setAuthChecked(true);
+
+          if (session?.user) {
+            syncService.loadDataFromServer().catch(err => {
+              console.error('[App] Failed to load data from server:', err);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[App] Error during session check:', error);
+        if (isMounted) {
+          setAuthChecked(true);
+        }
+      }
+    }
+
+    initializeApp();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       (async () => {
+        if (!isMounted) return;
+
         const prevUser = useStore.getState().user;
         const newUser = session?.user ?? null;
 
-        // CRITICAL: Clear data on logout or user change
         if (event === 'SIGNED_OUT' || (prevUser && newUser && prevUser.id !== newUser.id)) {
           console.warn('[App] User logout or change - clearing all data');
-          useStore.getState().clearUserData();
 
-          // Also clear localStorage and IndexedDB
-          localStorage.clear();
-          try {
-            await offlineStorage.clearAllData();
-          } catch (error) {
-            console.error('Failed to clear offline data:', error);
+          // Force navigation to auth view IMMEDIATELY for better UX
+          if (event === 'SIGNED_OUT') {
+            console.log('[App] SIGNED_OUT - redirecting to auth');
+            setCurrentView({ type: 'auth' });
           }
+
+          // Clear data in background (don't block UI)
+          useStore.getState().clearUserData();
+          localStorage.clear();
+          offlineStorage.clearAllData().catch(error => {
+            console.error('[App] Failed to clear offline data:', error);
+          });
         }
 
-        setUser(newUser);
+        if (isMounted) {
+          setUser(newUser);
 
-        // Load fresh data on new login
-        if (newUser && (!prevUser || prevUser.id !== newUser.id)) {
-          console.log('[App] New user login - loading fresh data');
-          await syncService.loadDataFromServer();
-        } else if (newUser) {
-          await syncService.syncWithServer();
+          if (newUser && (!prevUser || prevUser.id !== newUser.id)) {
+            console.log('[App] New user login - loading fresh data');
+            await syncService.loadDataFromServer().catch(err => {
+              console.error('[App] Failed to load data:', err);
+            });
+          } else if (newUser) {
+            await syncService.syncWithServer().catch(err => {
+              console.error('[App] Failed to sync:', err);
+            });
+          }
         }
       })();
     });
 
     const unsubscribeOnlineStatus = syncService.onOnlineStatusChange((online) => {
       if (online) {
-        syncService.syncWithServer();
+        syncService.syncWithServer().catch(err => {
+          console.error('[App] Failed to sync on reconnect:', err);
+        });
       }
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
       unsubscribeOnlineStatus();
     };
   }, [setUser]);
 
   useEffect(() => {
-    if (hasCompletedOnboarding && currentView.type === 'onboarding') {
+    if (hasCompletedOnboarding && currentView.type === 'onboarding' && !onboardingNavigatedRef.current) {
+      onboardingNavigatedRef.current = true;
       setCurrentView({ type: 'menu' });
     }
-  }, [hasCompletedOnboarding]);
+  }, [hasCompletedOnboarding, currentView.type]);
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-goflex-bg flex items-center justify-center">
-        <div className="text-goflex-blue">Loading...</div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-goflex-blue">Loading...</div>
+        </div>
+      </AppLayout>
     );
   }
 
@@ -250,7 +300,8 @@ function App() {
 
   if (currentView.type === 'menu') {
     return (
-      <Menu
+      <AppLayout showBottomNav>
+        <Menu
         onSelectFeature={(feature) => {
           if (feature === 'projects') {
             setCurrentView({ type: 'projectList' });
@@ -266,6 +317,8 @@ function App() {
             setCurrentView({ type: 'reports' });
           } else if (feature === 'admin') {
             setCurrentView({ type: 'admin' });
+          } else if (feature === 'myTickets') {
+            setCurrentView({ type: 'myTickets' });
           }
         }}
         onSettings={() => setCurrentView({ type: 'settings' })}
@@ -273,35 +326,76 @@ function App() {
           syncService.syncWithServer();
           setCurrentView({ type: 'thankYou' });
         }}
-      />
+        />
+        <MobileBottomNav
+          currentView="menu"
+          onNavigate={(view) => {
+            if (view === 'menu') {
+              setCurrentView({ type: 'menu' });
+            } else if (view === 'projects') {
+              setCurrentView({ type: 'projectList' });
+            } else if (view === 'speedTest') {
+              setCurrentView({ type: 'speedTest' });
+            } else if (view === 'support') {
+              window.dispatchEvent(new CustomEvent('open-support'));
+            } else if (view === 'settings') {
+              setCurrentView({ type: 'settings' });
+            }
+          }}
+        />
+      </AppLayout>
     );
   }
 
   if (currentView.type === 'speedTest') {
     return (
-      <SpeedTest
-        onBack={() => setCurrentView({ type: 'menu' })}
-        onSaveResult={async (result) => {
-          try {
-            await saveSpeedTest(result);
-          } catch (error) {
-            console.error('Failed to save speed test:', error);
-          }
-        }}
-      />
+      <AppLayout showBottomNav>
+        <SpeedTest
+          onBack={() => setCurrentView({ type: 'menu' })}
+          onSaveResult={async (result) => {
+            try {
+              await saveSpeedTest(result);
+            } catch (error) {
+              console.error('Failed to save speed test:', error);
+            }
+          }}
+        />
+        <MobileBottomNav
+          currentView="speedTest"
+          onNavigate={(view) => {
+            if (view === 'menu') {
+              setCurrentView({ type: 'menu' });
+            } else if (view === 'projects') {
+              setCurrentView({ type: 'projectList' });
+            } else if (view === 'speedTest') {
+              setCurrentView({ type: 'speedTest' });
+            } else if (view === 'support') {
+              window.dispatchEvent(new CustomEvent('open-support'));
+            } else if (view === 'settings') {
+              setCurrentView({ type: 'settings' });
+            }
+          }}
+        />
+      </AppLayout>
     );
   }
 
   if (currentView.type === 'linkBudget') {
-    return <LinkBudgetCalculator onBack={() => setCurrentView({ type: 'menu' })} />;
+    return (
+      <AppLayout>
+        <LinkBudgetCalculator onBack={() => setCurrentView({ type: 'menu' })} />
+      </AppLayout>
+    );
   }
 
   if (currentView.type === 'createProject') {
     return (
-      <CreateProject
-        onBack={() => setCurrentView({ type: 'projectList' })}
-        onProjectCreated={(projectId) => setCurrentView({ type: 'projectDetail', projectId })}
-      />
+      <AppLayout>
+        <CreateProject
+          onBack={() => setCurrentView({ type: 'projectList' })}
+          onProjectCreated={(projectId) => setCurrentView({ type: 'projectDetail', projectId })}
+        />
+      </AppLayout>
     );
   }
 
@@ -492,20 +586,30 @@ function App() {
   }
 
   if (currentView.type === 'cellTowerCompass') {
-    return <CellTowerCompass onBack={() => setCurrentView({ type: 'menu' })} />;
+    return (
+      <AppLayout>
+        <CellTowerCompass onBack={() => setCurrentView({ type: 'menu' })} />
+      </AppLayout>
+    );
   }
 
   if (currentView.type === 'analytics') {
     return (
-      <Analytics
-        onBack={() => setCurrentView({ type: 'menu' })}
-        onViewProject={(projectId) => setCurrentView({ type: 'projectDetail', projectId })}
-      />
+      <AppLayout>
+        <Analytics
+          onBack={() => setCurrentView({ type: 'menu' })}
+          onViewProject={(projectId) => setCurrentView({ type: 'projectDetail', projectId })}
+        />
+      </AppLayout>
     );
   }
 
   if (currentView.type === 'reports') {
-    return <Reports onBack={() => setCurrentView({ type: 'menu' })} />;
+    return (
+      <AppLayout>
+        <Reports onBack={() => setCurrentView({ type: 'menu' })} />
+      </AppLayout>
+    );
   }
 
   if (currentView.type === 'surveyReport') {
@@ -537,12 +641,22 @@ function App() {
     );
   }
 
+  if (currentView.type === 'myTickets') {
+    return (
+      <MyTickets onBack={() => setCurrentView({ type: 'menu' })} />
+    );
+  }
+
   if (currentView.type === 'selfTest') {
     return (
       <AdminRouteGuard onUnauthorized={() => setCurrentView({ type: 'menu' })}>
         <SelfTestConsole onBack={() => setCurrentView({ type: 'admin' })} />
       </AdminRouteGuard>
     );
+  }
+
+  if (currentView.type === 'testSupport') {
+    return <TestSupportSystem />;
   }
 
   if (currentView.type === 'commissioningChecklist') {
@@ -577,36 +691,58 @@ function App() {
   }
 
   return (
-    <div className="relative">
-      {/* Billing Phase Notice Banner - shown at top when user is logged in */}
-      {user && <BillingPhaseNoticeBanner />}
+    <AppLayout showBottomNav>
+      <div className="relative">
+        {/* Billing Phase Notice Banner - shown at top when user is logged in */}
+        {user && <BillingPhaseNoticeBanner />}
 
-      <OnlineStatus />
-      <button
-        onClick={() => setCurrentView({ type: 'settings' })}
-        className="fixed top-4 right-4 z-50 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors"
-        aria-label="Settings"
-      >
-        <SettingsIcon className="w-6 h-6 text-black" />
-      </button>
+        <OnlineStatus />
+        <button
+          onClick={() => setCurrentView({ type: 'settings' })}
+          className="fixed top-4 right-4 z-50 w-12 h-12 bg-white dark:bg-slate-800 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors touch-target lg:block hidden"
+          aria-label="Settings"
+        >
+          <SettingsIcon className="w-6 h-6 text-slate-900 dark:text-slate-100" />
+        </button>
 
-      {/* Inactivity Warning Modal */}
-      <InactivityWarningModal
-        isOpen={isWarningShown && !!user}
-        onStaySignedIn={resetTimer}
-        onSignOut={async () => {
-          await supabase.auth.signOut();
-          setCurrentView({ type: 'auth' });
-        }}
-        remainingMinutes={5}
-      />
+        {/* Inactivity Warning Modal */}
+        <InactivityWarningModal
+          isOpen={isWarningShown && !!user}
+          onStaySignedIn={resetTimer}
+          onSignOut={async () => {
+            await supabase.auth.signOut();
+            window.location.href = '/';
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 1000);
+          }}
+          remainingMinutes={5}
+        />
 
-      <ProjectList
-        onCreateProject={() => setCurrentView({ type: 'createProject' })}
-        onSelectProject={(projectId) => setCurrentView({ type: 'projectDetail', projectId })}
-        onBack={() => setCurrentView({ type: 'menu' })}
-      />
-    </div>
+        <ProjectList
+          onCreateProject={() => setCurrentView({ type: 'createProject' })}
+          onSelectProject={(projectId) => setCurrentView({ type: 'projectDetail', projectId })}
+          onBack={() => setCurrentView({ type: 'menu' })}
+        />
+
+        <MobileBottomNav
+          currentView="projects"
+          onNavigate={(view) => {
+            if (view === 'menu') {
+              setCurrentView({ type: 'menu' });
+            } else if (view === 'projects') {
+              setCurrentView({ type: 'projectList' });
+            } else if (view === 'speedTest') {
+              setCurrentView({ type: 'speedTest' });
+            } else if (view === 'support') {
+              window.dispatchEvent(new CustomEvent('open-support'));
+            } else if (view === 'settings') {
+              setCurrentView({ type: 'settings' });
+            }
+          }}
+        />
+      </div>
+    </AppLayout>
   );
 }
 

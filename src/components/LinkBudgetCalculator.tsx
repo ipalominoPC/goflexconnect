@@ -107,30 +107,29 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
-      <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center justify-between mb-8">
           <button
             onClick={onBack}
-            className="flex items-center text-gray-400 hover:text-white transition-colors"
+            className="flex items-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back
           </button>
           <div className="flex items-center">
             <Calculator className="w-8 h-8 text-goflex-blue mr-3" />
-            <h1 className="text-3xl font-bold text-white">Link Budget Calculator</h1>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Link Budget Calculator</h1>
           </div>
           <div className="w-24"></div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-xl font-bold text-white mb-6">Input Parameters</h2>
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-lg transition-colors duration-300 ease-in-out">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Input Parameters</h2>
 
             <div className="space-y-5">
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Frequency (MHz)
                   <InfoTooltip id="frequency" text="Operating frequency in MHz. Typical LTE: 700-2600, 5G: 600-3700" />
                 </label>
@@ -138,12 +137,12 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   type="number"
                   value={params.frequency}
                   onChange={(e) => updateParam('frequency', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Transmit Power (dBm)
                   <InfoTooltip id="txPower" text="Base station transmit power. Typical range: 40-46 dBm" />
                 </label>
@@ -151,12 +150,12 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   type="number"
                   value={params.txPower}
                   onChange={(e) => updateParam('txPower', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   TX Antenna Gain (dBi)
                   <InfoTooltip id="txGain" text="Base station antenna gain. Typical: 15-21 dBi" />
                 </label>
@@ -164,12 +163,12 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   type="number"
                   value={params.txGain}
                   onChange={(e) => updateParam('txGain', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   RX Antenna Gain (dBi)
                   <InfoTooltip id="rxGain" text="User equipment antenna gain. Mobile: 0 dBi, CPE: 5-15 dBi" />
                 </label>
@@ -177,12 +176,12 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   type="number"
                   value={params.rxGain}
                   onChange={(e) => updateParam('rxGain', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   TX Cable Loss (dB)
                   <InfoTooltip id="cableLossTx" text="Feeder cable loss at base station. Typical: 2-3 dB" />
                 </label>
@@ -190,12 +189,12 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   type="number"
                   value={params.cableLossTx}
                   onChange={(e) => updateParam('cableLossTx', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   RX Cable Loss (dB)
                   <InfoTooltip id="cableLossRx" text="Cable loss at receiver. Mobile: 0 dB, CPE: 1-2 dB" />
                 </label>
@@ -203,12 +202,12 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   type="number"
                   value={params.cableLossRx}
                   onChange={(e) => updateParam('cableLossRx', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Distance (km)
                   <InfoTooltip id="distance" text="Distance between transmitter and receiver in kilometers" />
                 </label>
@@ -217,12 +216,12 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   step="0.1"
                   value={params.distance}
                   onChange={(e) => updateParam('distance', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   TX Height (m)
                   <InfoTooltip id="heightTx" text="Base station antenna height above ground. Typical: 20-50m" />
                 </label>
@@ -230,12 +229,12 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   type="number"
                   value={params.heightTx}
                   onChange={(e) => updateParam('heightTx', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   RX Height (m)
                   <InfoTooltip id="heightRx" text="Receiver antenna height above ground. Mobile: 1.5m, Fixed: 5-10m" />
                 </label>
@@ -243,19 +242,19 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
                   type="number"
                   value={params.heightRx}
                   onChange={(e) => updateParam('heightRx', parseFloat(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Environment
                   <InfoTooltip id="environment" text="Propagation environment affects path loss model" />
                 </label>
                 <select
                   value={params.environment}
                   onChange={(e) => updateParam('environment', e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-goflex-blue focus:border-transparent"
                 >
                   <option value="free-space">Free Space</option>
                   <option value="urban">Urban (Okumura-Hata)</option>
@@ -268,7 +267,7 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
 
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-goflex-blue/10 to-blue-600/10 backdrop-blur-sm border border-goflex-blue/30 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-6">Results</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Results</h2>
 
               <div className="space-y-4">
                 <div className="bg-gray-900/50 rounded-lg p-4">
@@ -344,7 +343,7 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
               </div>
             </div>
 
-            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-6">
+            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-lg transition-colors duration-300 ease-in-out">
               <h3 className="text-lg font-bold text-white mb-4">Link Status</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -373,6 +372,5 @@ export default function LinkBudgetCalculator({ onBack }: LinkBudgetCalculatorPro
           </div>
         </div>
       </div>
-    </div>
   );
 }

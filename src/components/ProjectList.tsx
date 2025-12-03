@@ -1,10 +1,12 @@
-import { Plus, MapPin, Calendar, Radio, ArrowLeft } from 'lucide-react';
+import { Plus, MapPin, Calendar, Radio, ArrowLeft, Shield } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { createSampleProjects, createSampleMeasurements } from '../services/mockData';
 import AdSlot from './AdSlot';
 import UsageNoticeBar from './UsageNoticeBar';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import UpgradeProModal from './UpgradeProModal';
+import { supabase } from '../services/supabaseClient';
+import { isAdminEmail } from '../config/admin';
 
 interface ProjectListProps {
   onCreateProject: () => void;
@@ -18,6 +20,17 @@ export default function ProjectList({ onCreateProject, onSelectProject, onBack }
   const addProject = useStore((state) => state.addProject);
   const addMeasurement = useStore((state) => state.addMeasurement);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setIsAdmin(isAdminEmail(user.email));
+      }
+    };
+    checkAdmin();
+  }, []);
 
   const loadSampleData = () => {
     const sampleProjects = createSampleProjects();
@@ -38,7 +51,7 @@ export default function ProjectList({ onCreateProject, onSelectProject, onBack }
   };
 
   return (
-    <div className="min-h-screen bg-goflex-bg dark:bg-goflex-bg">
+    <>
       <div className="max-w-5xl mx-auto px-6 py-12">
         <button
           onClick={onBack}
@@ -55,9 +68,17 @@ export default function ProjectList({ onCreateProject, onSelectProject, onBack }
               className="h-12 w-12 rounded-2xl"
             />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                GoFlexConnect
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  GoFlexConnect
+                </h1>
+                {isAdmin && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold rounded-full shadow-sm">
+                    <Shield className="w-3.5 h-3.5" />
+                    Admin Mode
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Signal survey platform
               </p>
@@ -74,7 +95,7 @@ export default function ProjectList({ onCreateProject, onSelectProject, onBack }
         </div>
 
         {projects.length === 0 && (
-          <div className="bg-white dark:bg-goflex-card rounded-2xl p-12 text-center mb-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="bg-white dark:bg-slate-900/90 rounded-2xl p-12 text-center mb-6 border border-slate-200 dark:border-slate-800 shadow-lg transition-colors duration-300 ease-in-out">
             <div className="w-20 h-20 bg-gradient-to-br from-goflex-blue to-goflex-blue-dark rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-goflex-blue/20">
               <MapPin className="w-10 h-10 text-white" />
             </div>
@@ -107,7 +128,7 @@ export default function ProjectList({ onCreateProject, onSelectProject, onBack }
             <button
               key={project.id}
               onClick={() => onSelectProject(project.id)}
-              className="group bg-white dark:bg-goflex-card rounded-2xl p-6 border border-slate-200 dark:border-slate-700 hover:border-goflex-blue/30 hover:shadow-lg hover:shadow-goflex-blue/5 transition-all duration-200 text-left"
+              className="group bg-white dark:bg-slate-900/90 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 hover:border-goflex-blue/30 hover:shadow-lg hover:shadow-goflex-blue/5 transition-all duration-300 ease-in-out text-left"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
@@ -151,6 +172,6 @@ export default function ProjectList({ onCreateProject, onSelectProject, onBack }
       {showUpgradeModal && (
         <UpgradeProModal onClose={() => setShowUpgradeModal(false)} />
       )}
-    </div>
+    </>
   );
 }

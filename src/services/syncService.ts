@@ -256,18 +256,36 @@ class SyncService {
 
   async loadDataFromServer() {
     if (!this.isOnline()) {
+      console.log('[SyncService] Offline - skipping data load');
       return;
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('[SyncService] Failed to get user:', userError);
+        return;
+      }
+      if (!user) {
+        console.log('[SyncService] No user - skipping data load');
+        return;
+      }
 
       const [projectsResult, floorsResult, speedTestsResult] = await Promise.all([
         supabase.from('projects').select('id, name, location, building_level, notes, floor_plan_image, created_at, updated_at, user_id, analytics').eq('user_id', user.id),
         supabase.from('floors').select('*').eq('user_id', user.id),
         supabase.from('speed_tests').select('*').eq('user_id', user.id),
       ]);
+
+      if (projectsResult.error) {
+        console.error('[SyncService] Failed to load projects:', projectsResult.error);
+      }
+      if (floorsResult.error) {
+        console.error('[SyncService] Failed to load floors:', floorsResult.error);
+      }
+      if (speedTestsResult.error) {
+        console.error('[SyncService] Failed to load speed tests:', speedTestsResult.error);
+      }
 
       if (projectsResult.data) {
         for (const project of projectsResult.data) {

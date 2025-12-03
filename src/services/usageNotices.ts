@@ -9,6 +9,8 @@ import { supabase } from './supabaseClient';
 import { resolveUserPlan } from './planService';
 import { getLimitsForPlan } from '../config/planLimits';
 import { findApplicableNoticeRule, interpolateMessage } from '../config/usageNotices';
+import { isAdminEmail } from '../config/admin';
+import { fetchBillingPhase } from './billingPhaseService';
 
 export type UsageNoticeContext =
   | { type: 'dashboard' }
@@ -34,7 +36,19 @@ export async function getUsageNotices(
   userId: string,
   context: UsageNoticeContext
 ): Promise<UsageNotice[]> {
-  // 1. Check if user is PRO - PRO users don't get usage notices
+  // 1. Check billing phase - don't show notices during BETA_FREE
+  const billingPhase = await fetchBillingPhase();
+  if (billingPhase.phase === 'BETA_FREE') {
+    return [];
+  }
+
+  // 2. Check if user is an admin - admins don't get usage notices
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user?.email && isAdminEmail(user.email)) {
+    return [];
+  }
+
+  // 3. Check if user is PRO - PRO users don't get usage notices
   const resolved = await resolveUserPlan(userId);
   if (resolved.plan === 'pro') {
     return [];
@@ -44,7 +58,7 @@ export async function getUsageNotices(
   const limits = getLimitsForPlan('free');
 
   try {
-    // 2. Check context-specific usage
+    // 4. Check context-specific usage
     switch (context.type) {
       case 'dashboard':
         // Check project count

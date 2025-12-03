@@ -6,9 +6,8 @@
  */
 
 export const ADMIN_EMAILS = [
-  'ipalominopc@gmail.com',
+  'ipalomino@gmail.com',
   'isaac@goflexconnect.com',
-  'isaac@goflexcloud.com',
   'dev@goflexconnect.com',
 ];
 

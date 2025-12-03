@@ -107,10 +107,31 @@ Deno.serve(async (req: Request) => {
       "MIME-Version: 1.0",
       "Content-Type: text/html; charset=utf-8",
       "",
-      "<h1>SMTP Test Successful!</h1>",
-      "<p>Your SMTP configuration is working correctly.</p>",
-      "<p>Server: smtp.ionos.com</p>",
-      "<p>From: forgot@goflexconnect.com</p>",
+      `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="background-color:#ffffff;max-width:600px;margin:0 auto;padding:24px;">
+    <img
+      src="https://raw.githubusercontent.com/ipalominoPC/goflexconnect/main/public/icons/logo-128.png"
+      alt="GoFlexConnect"
+      width="80"
+      height="80"
+      style="display:block; margin:0 auto 20px auto; border:0; outline:none; text-decoration:none;"
+    />
+    <div style="font-size: 28px; font-weight: bold; color: #1a1a1a; padding-bottom: 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      GoFlexConnect
+    </div>
+    <h1>SMTP Test Successful!</h1>
+    <p>Your SMTP configuration is working correctly.</p>
+    <p>Server: smtp.ionos.com</p>
+    <p>From: forgot@goflexconnect.com</p>
+  </div>
+</body>
+</html>`,
       ".",
     ].join("\r\n");
 

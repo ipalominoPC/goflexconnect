@@ -10,6 +10,7 @@ export default function SelfTestConsole({ onBack }: SelfTestConsoleProps) {
   const [selectedTests, setSelectedTests] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<TestResult[]>([]);
   const [running, setRunning] = useState(false);
+  const [rlsRunning, setRlsRunning] = useState(false);
   const [rlsDiagnostic, setRlsDiagnostic] = useState<{ success: boolean; details: string[]; errors: string[] } | null>(null);
 
   const handleSelectAll = () => {
@@ -31,13 +32,17 @@ export default function SelfTestConsole({ onBack }: SelfTestConsoleProps) {
   };
 
   const handleRunAll = async () => {
+    console.log('[handleRunAll] Button clicked, starting tests...');
     setRunning(true);
     try {
+      console.log('[handleRunAll] Calling runAllTests()...');
       const testResults = await runAllTests();
+      console.log('[handleRunAll] Tests completed, results:', testResults);
       setResults(testResults);
     } catch (error) {
-      console.error('Error running tests:', error);
+      console.error('[handleRunAll] Error running tests:', error);
     } finally {
+      console.log('[handleRunAll] Setting running=false');
       setRunning(false);
     }
   };
@@ -60,10 +65,26 @@ export default function SelfTestConsole({ onBack }: SelfTestConsoleProps) {
   };
 
   const handleRLSDiagnostic = async () => {
+    if (rlsRunning) return;
+
+    setRlsRunning(true);
+    setRlsDiagnostic(null);
     console.log('Running RLS diagnostic...');
-    const result = await testRLSPolicies();
-    setRlsDiagnostic(result);
-    console.log('RLS Diagnostic Result:', result);
+
+    try {
+      const result = await testRLSPolicies();
+      setRlsDiagnostic(result);
+      console.log('RLS Diagnostic Result:', result);
+    } catch (error) {
+      console.error('RLS diagnostic error:', error);
+      setRlsDiagnostic({
+        success: false,
+        details: [],
+        errors: [`Failed to run diagnostic: ${error}`],
+      });
+    } finally {
+      setRlsRunning(false);
+    }
   };
 
   const getResultForTest = (testId: string) => {
@@ -116,10 +137,20 @@ export default function SelfTestConsole({ onBack }: SelfTestConsoleProps) {
           <div className="mt-4">
             <button
               onClick={handleRLSDiagnostic}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2"
+              disabled={rlsRunning}
+              className={`px-4 py-2 ${rlsRunning ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'} text-white font-semibold rounded-lg transition-all flex items-center gap-2`}
             >
-              <Bug className="w-4 h-4" />
-              Run RLS Diagnostic
+              {rlsRunning ? (
+                <>
+                  <Clock className="w-4 h-4 animate-spin" />
+                  Running RLS Test...
+                </>
+              ) : (
+                <>
+                  <Bug className="w-4 h-4" />
+                  Run RLS Diagnostic
+                </>
+              )}
             </button>
             {rlsDiagnostic && (
               <div className={`mt-3 p-4 rounded-lg ${rlsDiagnostic.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'}`}>

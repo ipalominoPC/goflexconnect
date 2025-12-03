@@ -227,43 +227,16 @@ export default function AdminDashboard({ onBack, onSelfTest }: AdminDashboardPro
         fromDate.setDate(now.getDate() - 30);
       }
 
-      // Query session_events
+      // Query session_events using RPC function that includes user emails
       const { data, error } = await supabase
-        .from('session_events')
-        .select(`
-          id,
-          created_at,
-          user_id,
-          event_type,
-          device_info,
-          ip_address,
-          metadata
-        `)
-        .gte('created_at', fromDate.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .rpc('admin_get_session_events', {
+          from_timestamp: fromDate.toISOString(),
+          result_limit: 50
+        });
 
       if (error) throw error;
 
-      // Fetch user emails (in production, use a JOIN or RPC)
-      const eventsWithEmails = await Promise.all(
-        (data || []).map(async (event) => {
-          try {
-            const { data: { user } } = await supabase.auth.admin.getUserById(event.user_id);
-            return {
-              ...event,
-              user_email: user?.email || 'Unknown',
-            };
-          } catch {
-            return {
-              ...event,
-              user_email: 'Unknown',
-            };
-          }
-        })
-      );
-
-      setSessionEvents(eventsWithEmails as SessionEvent[]);
+      setSessionEvents((data || []) as SessionEvent[]);
     } catch (error) {
       console.error('Failed to load session events:', error);
       setSessionEvents([]);

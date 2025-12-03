@@ -20,6 +20,7 @@ export default function SupportForm({ onClose }: SupportFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [ticketId, setTicketId] = useState<string | null>(null);
+  const [ticketNumber, setTicketNumber] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,6 +41,8 @@ export default function SupportForm({ onClose }: SupportFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Support][UI] Submitting support request');
+    console.log('[Support][UI] User authenticated:', !!user, 'User ID:', user?.id);
     setSubmitting(true);
     setError(null);
     setSuccess(false);
@@ -55,6 +58,8 @@ export default function SupportForm({ onClose }: SupportFormProps) {
         throw new Error('Message is required');
       }
 
+      console.log('[Support][UI] Form data valid, calling createSupportTicket...');
+
       const result = await createSupportTicket(
         {
           name: formData.name.trim(),
@@ -67,7 +72,8 @@ export default function SupportForm({ onClose }: SupportFormProps) {
         user?.id
       );
 
-      setTicketId(result.ticketId);
+      console.log('[Support] Ticket created successfully:', result);
+      setTicketNumber(result.ticketNumber);
       setSuccess(true);
 
       setFormData((prev) => ({
@@ -77,11 +83,14 @@ export default function SupportForm({ onClose }: SupportFormProps) {
       }));
 
       setTimeout(() => {
+        setSuccess(false);
         onClose();
-      }, 4000);
-    } catch (err) {
-      console.error('Error submitting support ticket:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit support request');
+      }, 2500);
+    } catch (err: any) {
+      console.error('[Support][UI] Failed to create ticket:', err);
+
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Error: ${errorMessage}. If this persists, email support@goflexconnect.com`);
     } finally {
       setSubmitting(false);
     }
@@ -95,30 +104,44 @@ export default function SupportForm({ onClose }: SupportFormProps) {
     { value: 'feedback', label: 'Feedback' },
   ];
 
-  if (success && ticketId) {
+  if (success && ticketNumber) {
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-8 text-center animate-in zoom-in-95">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Thank You!</h3>
-          <p className="text-slate-600 dark:text-slate-400 mb-2">
-            Your support request has been submitted successfully.
-          </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            Ticket ID: <span className="font-mono font-bold text-[#27AAE1]">{ticketId.slice(0, 8)}</span>
-          </p>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Our team will respond to your email as soon as possible.
-          </p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 text-center">
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3">
+              <CheckCircle className="w-10 h-10 text-green-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">
+              Ticket Submitted!
+            </h3>
+            <p className="text-xl font-mono font-bold text-white">
+              #{ticketNumber}
+            </p>
+          </div>
+          <div className="p-6 text-center">
+            <p className="text-base text-slate-700 dark:text-slate-300 mb-4">
+              We've received your request and will respond within 24 hours
+            </p>
+            <button
+              onClick={() => {
+                setSuccess(false);
+                onClose();
+              }}
+              className="w-full px-6 py-3 bg-[#27AAE1] hover:bg-[#0178B7] text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg my-8 animate-in zoom-in-95 slide-in-from-bottom-4">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end lg:items-center justify-center p-0 lg:p-4 z-50 overflow-y-auto animate-in fade-in">
+      <div className="bg-white dark:bg-slate-900 rounded-t-3xl lg:rounded-2xl shadow-xl w-full max-w-lg my-0 lg:my-8 max-h-[95vh] overflow-y-auto animate-in zoom-in-95 slide-in-from-bottom-4">
+        <div className="flex items-center justify-between p-4 lg:p-6 border-b border-slate-200 dark:border-slate-700 pt-safe">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[#27AAE1]/20 rounded-lg flex items-center justify-center">
               <MessageSquare className="w-5 h-5 text-[#27AAE1]" />
@@ -145,7 +168,7 @@ export default function SupportForm({ onClose }: SupportFormProps) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 lg:p-6 space-y-4 lg:space-y-5 pb-safe">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -155,7 +178,7 @@ export default function SupportForm({ onClose }: SupportFormProps) {
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1]"
+                className="w-full px-4 py-3 lg:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1] text-base touch-target"
                 placeholder="Your name"
                 required
               />
@@ -169,8 +192,9 @@ export default function SupportForm({ onClose }: SupportFormProps) {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1]"
+                className="w-full px-4 py-3 lg:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1] text-base touch-target"
                 placeholder="your@email.com"
+                inputMode="email"
                 required
               />
             </div>
@@ -185,8 +209,9 @@ export default function SupportForm({ onClose }: SupportFormProps) {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1]"
+                className="w-full px-4 py-3 lg:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1] text-base touch-target"
                 placeholder="(555) 123-4567"
+                inputMode="tel"
               />
             </div>
 
@@ -197,7 +222,7 @@ export default function SupportForm({ onClose }: SupportFormProps) {
               <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value as SupportCategory })}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1]"
+                className="w-full px-4 py-3 lg:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1] text-base touch-target"
                 required
               >
                 {categories.map((cat) => (
@@ -217,7 +242,7 @@ export default function SupportForm({ onClose }: SupportFormProps) {
               type="text"
               value={formData.subject}
               onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1]"
+              className="w-full px-4 py-3 lg:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1] text-base touch-target"
               placeholder="Brief description"
             />
           </div>
@@ -230,7 +255,7 @@ export default function SupportForm({ onClose }: SupportFormProps) {
               value={formData.message}
               onChange={(e) => setFormData({ ...formData, message: e.target.value })}
               rows={6}
-              className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1] resize-none"
+              className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 focus:border-[#27AAE1] resize-none text-base"
               placeholder="Please describe your issue or request in detail..."
               required
             />
@@ -242,7 +267,7 @@ export default function SupportForm({ onClose }: SupportFormProps) {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-[#27AAE1] hover:bg-[#0178B7] disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-[#27AAE1]/25 flex items-center justify-center gap-2"
+            className="w-full bg-[#27AAE1] hover:bg-[#0178B7] active:scale-95 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-semibold py-4 lg:py-3 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-[#27AAE1]/25 flex items-center justify-center gap-2 touch-target"
           >
             {submitting ? (
               <>
@@ -256,6 +281,12 @@ export default function SupportForm({ onClose }: SupportFormProps) {
               </>
             )}
           </button>
+
+          <div className="text-center pt-4 border-t border-slate-200 dark:border-slate-700">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Powered by <span className="font-semibold text-[#27AAE1]">GoFlexConnect</span>
+            </p>
+          </div>
         </form>
       </div>
     </div>

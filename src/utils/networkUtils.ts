@@ -391,3 +391,36 @@ export function getConnectionLabel(connectionType: NetworkContext['connectionTyp
       return 'Unknown';
   }
 }
+
+export interface ConnectionMetricsOptions {
+  detectedConnection: string;
+  cellularType?: string;
+  downloadMbps?: number;
+  uploadMbps?: number;
+  latencyMs?: number;
+}
+
+export function formatConnectionMetrics(options: ConnectionMetricsOptions): string {
+  const { detectedConnection, cellularType, downloadMbps, uploadMbps, latencyMs } = options;
+
+  const isWifi = detectedConnection.toLowerCase() === 'wifi';
+  const connectionLabel = isWifi
+    ? 'Wi-Fi'
+    : (cellularType || 'Cellular');
+
+  const parts: string[] = [`Connection: ${connectionLabel}`];
+
+  if (downloadMbps !== undefined && !isNaN(downloadMbps)) {
+    parts.push(`Downlink: ${downloadMbps.toFixed(1)} Mbps`);
+  }
+
+  if (uploadMbps !== undefined && !isNaN(uploadMbps)) {
+    parts.push(`Upload: ${uploadMbps.toFixed(1)} Mbps`);
+  }
+
+  if (latencyMs !== undefined && !isNaN(latencyMs)) {
+    parts.push(`RTT: ${latencyMs} ms`);
+  }
+
+  return parts.join(' • ');
+}

@@ -1,12 +1,14 @@
 {
-  "name": "GoFlexConnect",
+  "name": "GoFlexConnect - Signal Survey",
   "short_name": "GoFlexConnect",
   "description": "Professional RF signal survey and indoor heatmap platform for wireless network optimization",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0F172A",
   "theme_color": "#0066CC",
-  "orientation": "portrait-primary",
+  "orientation": "any",
+  "scope": "/",
+  "categories": ["business", "productivity", "utilities"],
   "icons": [
     {
       "src": "/icons/logo-96.png",

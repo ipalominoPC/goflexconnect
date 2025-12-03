@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Folder, Gauge, Settings as SettingsIcon, LogOut, Calculator, Compass, HelpCircle, BarChart3, FileText, Shield } from 'lucide-react';
+import { Folder, Gauge, Settings as SettingsIcon, LogOut, Calculator, Compass, HelpCircle, BarChart3, FileText, Shield, Ticket } from 'lucide-react';
 import Chatbot, { ChatbotButton } from './Chatbot';
 import SupportForm from './SupportForm';
-import ThemeToggle from './ThemeToggle';
 import HouseAdBanner from './HouseAdBanner';
 import UpgradeProModal from './UpgradeProModal';
 import EmailVerificationBanner from './EmailVerificationBanner';
@@ -14,7 +13,7 @@ import { isAdminEmail } from '../config/admin';
 import { useOnboarding } from '../hooks/useOnboarding';
 
 interface MenuProps {
-  onSelectFeature: (feature: 'projects' | 'speedTest' | 'linkBudget' | 'cellTowerCompass' | 'analytics' | 'reports' | 'admin') => void;
+  onSelectFeature: (feature: 'projects' | 'speedTest' | 'linkBudget' | 'cellTowerCompass' | 'analytics' | 'reports' | 'admin' | 'myTickets') => void;
   onSettings: () => void;
   onFinish: () => void;
 }
@@ -47,10 +46,10 @@ export default function Menu({ onSelectFeature, onSettings, onFinish }: MenuProp
 
   // Show onboarding modal for non-admin users who haven't completed it
   useEffect(() => {
-    if (!onboardingLoading && !onboardingIsAdmin && !isCompleted) {
+    if (!onboardingLoading && !onboardingIsAdmin && !isCompleted && !showOnboarding) {
       setShowOnboarding(true);
     }
-  }, [onboardingLoading, onboardingIsAdmin, isCompleted]);
+  }, [onboardingLoading, onboardingIsAdmin, isCompleted, showOnboarding]);
 
   const handleFinish = async () => {
     await logSessionEvent({ eventType: 'sign_out' });
@@ -58,10 +57,9 @@ export default function Menu({ onSelectFeature, onSettings, onFinish }: MenuProp
   };
 
   return (
-    <div className="min-h-screen bg-goflex-bg">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
         <div className="fixed top-4 right-4 z-50 flex gap-2">
-          <ThemeToggle />
           <button
             onClick={() => setSupportOpen(true)}
             className="w-12 h-12 bg-goflex-card border border-gray-700 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-800 transition-colors"
@@ -103,10 +101,10 @@ export default function Menu({ onSelectFeature, onSettings, onFinish }: MenuProp
                 className="h-20 w-20 rounded-3xl shadow-lg"
               />
             </div>
-            <h1 className="text-5xl font-bold text-white dark:text-white mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            <h1 className="text-5xl font-bold text-slate-900 dark:text-white mb-4" style={{ fontFamily: 'Montserrat, sans-serif' }}>
               GoFlexConnect
             </h1>
-            <p className="text-gray-400 text-lg">
+            <p className="text-slate-600 dark:text-slate-400 text-lg">
               Select a feature to get started
             </p>
           </div>
@@ -114,106 +112,123 @@ export default function Menu({ onSelectFeature, onSettings, onFinish }: MenuProp
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <button
               onClick={() => onSelectFeature('projects')}
-              className="group bg-goflex-card border border-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:border-goflex-blue transition-all duration-300 hover:-translate-y-1 text-left"
+              className="group bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-goflex-blue transition-all duration-300 ease-in-out hover:-translate-y-1 text-left"
             >
-              <div className="w-16 h-16 bg-goflex-blue/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 bg-goflex-blue/10 dark:bg-goflex-blue/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Folder className="w-8 h-8 text-goflex-blue" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
                 Survey Projects
               </h2>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                 Create and manage site survey projects, upload floor plans, collect measurements, and generate heatmaps
               </p>
             </button>
 
             <button
               onClick={() => onSelectFeature('speedTest')}
-              className="group bg-goflex-card border border-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:border-goflex-blue transition-all duration-300 hover:-translate-y-1 text-left"
+              className="group bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-goflex-blue transition-all duration-300 ease-in-out hover:-translate-y-1 text-left"
             >
-              <div className="w-16 h-16 bg-goflex-blue/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 bg-goflex-blue/10 dark:bg-goflex-blue/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Gauge className="w-8 h-8 text-goflex-blue" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
                 Speed Test
               </h2>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                 Test your network speed and view detailed cellular metrics including signal strength and network information
               </p>
             </button>
 
             <button
               onClick={() => onSelectFeature('linkBudget')}
-              className="group bg-goflex-card border border-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:border-goflex-blue transition-all duration-300 hover:-translate-y-1 text-left"
+              className="group bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-goflex-blue transition-all duration-300 ease-in-out hover:-translate-y-1 text-left"
             >
-              <div className="w-16 h-16 bg-goflex-blue/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 bg-goflex-blue/10 dark:bg-goflex-blue/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Calculator className="w-8 h-8 text-goflex-blue" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
                 Link Budget
               </h2>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                 Calculate RF link budgets with path loss models for LTE and 5G network planning
               </p>
             </button>
 
             <button
               onClick={() => onSelectFeature('cellTowerCompass')}
-              className="group bg-goflex-card border border-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:border-goflex-blue transition-all duration-300 hover:-translate-y-1 text-left"
+              className="group bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-goflex-blue transition-all duration-300 ease-in-out hover:-translate-y-1 text-left"
             >
-              <div className="w-16 h-16 bg-goflex-blue/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 bg-goflex-blue/10 dark:bg-goflex-blue/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Compass className="w-8 h-8 text-goflex-blue" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
                 Cell Tower Compass
               </h2>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                 Find and navigate to nearby cell towers with compass direction guidance
               </p>
             </button>
 
             <button
               onClick={() => onSelectFeature('analytics')}
-              className="group bg-goflex-card border border-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:border-goflex-blue transition-all duration-300 hover:-translate-y-1 text-left"
+              className="group bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-goflex-blue transition-all duration-300 ease-in-out hover:-translate-y-1 text-left"
             >
-              <div className="w-16 h-16 bg-goflex-blue/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 bg-goflex-blue/10 dark:bg-goflex-blue/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <BarChart3 className="w-8 h-8 text-goflex-blue" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
                 Analytics
               </h2>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                 View comprehensive insights and AI-powered analysis of your survey data
               </p>
             </button>
 
             <button
               onClick={() => onSelectFeature('reports')}
-              className="group bg-goflex-card border border-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:border-goflex-blue transition-all duration-300 hover:-translate-y-1 text-left"
+              className="group bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-goflex-blue transition-all duration-300 ease-in-out hover:-translate-y-1 text-left"
             >
-              <div className="w-16 h-16 bg-goflex-blue/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 bg-goflex-blue/10 dark:bg-goflex-blue/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <FileText className="w-8 h-8 text-goflex-blue" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
                 Reports
               </h2>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                 View user signups, survey volume, quality metrics, and sites needing attention
               </p>
             </button>
 
+            {userEmail && (
+              <button
+                onClick={() => onSelectFeature('myTickets')}
+                className="group bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-goflex-blue transition-all duration-300 ease-in-out hover:-translate-y-1 text-left"
+              >
+                <div className="w-16 h-16 bg-goflex-blue/10 dark:bg-goflex-blue/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <Ticket className="w-8 h-8 text-goflex-blue" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
+                  My Tickets
+                </h2>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Track your support requests and view ticket history
+                </p>
+              </button>
+            )}
+
             {isAdmin && (
               <button
                 onClick={() => onSelectFeature('admin')}
-                className="group bg-goflex-card border border-red-800 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:border-red-600 transition-all duration-300 hover:-translate-y-1 text-left"
+                className="group bg-white dark:bg-slate-900/90 border border-red-400/40 dark:border-red-500/50 rounded-2xl p-8 shadow-lg hover:shadow-xl hover:bg-red-50 dark:hover:bg-slate-800 hover:border-red-500 transition-all duration-300 ease-in-out hover:-translate-y-1 text-left"
               >
-                <div className="w-16 h-16 bg-red-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Shield className="w-8 h-8 text-red-500" />
+                <div className="w-16 h-16 bg-red-500/15 dark:bg-red-500/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <Shield className="w-8 h-8 text-red-500 dark:text-red-400" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-3">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-3">
                   Admin Dashboard
                 </h2>
-                <p className="text-gray-400 leading-relaxed">
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                   Secure access to session logs, user activity, and advanced reports
                 </p>
               </button>

@@ -48,76 +48,92 @@ export async function testRLSPolicies(): Promise<{
 }> {
   const details: string[] = [];
   const errors: string[] = [];
+  const TIMEOUT = 15000; // 15 second timeout
 
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      errors.push('No authenticated user');
+  const runTest = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        errors.push('No authenticated user');
+        return { success: false, details, errors };
+      }
+
+      details.push(`Testing as user: ${user.email} (${user.id})`);
+
+      const testEventId = generateUUID();
+      const testProjectId = generateUUID();
+
+      // Test 1: INSERT
+      details.push('Test 1: Attempting INSERT...');
+      const { data: insertData, error: insertError } = await supabase
+        .from('usage_events')
+        .insert({
+          id: testEventId,
+          user_id: user.id,
+          event_type: 'rls_diagnostic_test',
+          project_id: testProjectId,
+          is_test: true,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        errors.push(`INSERT failed: ${insertError.message} (code: ${insertError.code})`);
+      } else {
+        details.push(`INSERT success: Created event ${insertData.id}`);
+      }
+
+      // Test 2: SELECT with filter
+      details.push('Test 2: Attempting SELECT with is_test filter...');
+      const { data: selectData, error: selectError } = await supabase
+        .from('usage_events')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_test', true)
+        .order('created_at', { ascending: true });
+
+      if (selectError) {
+        errors.push(`SELECT failed: ${selectError.message} (code: ${selectError.code})`);
+      } else {
+        details.push(`SELECT success: Found ${selectData?.length || 0} test events`);
+      }
+
+      // Test 3: DELETE
+      details.push('Test 3: Attempting DELETE...');
+      const { error: deleteError } = await supabase
+        .from('usage_events')
+        .delete()
+        .eq('id', testEventId)
+        .eq('user_id', user.id)
+        .eq('is_test', true);
+
+      if (deleteError) {
+        errors.push(`DELETE failed: ${deleteError.message} (code: ${deleteError.code})`);
+      } else {
+        details.push(`DELETE success: Removed test event`);
+      }
+
+      return {
+        success: errors.length === 0,
+        details,
+        errors,
+      };
+    } catch (error: any) {
+      errors.push(`Unexpected error: ${error.message}`);
       return { success: false, details, errors };
     }
+  };
 
-    details.push(`Testing as user: ${user.email} (${user.id})`);
-
-    const testEventId = generateUUID();
-    const testProjectId = generateUUID();
-
-    // Test 1: INSERT
-    details.push('Test 1: Attempting INSERT...');
-    const { data: insertData, error: insertError } = await supabase
-      .from('usage_events')
-      .insert({
-        id: testEventId,
-        user_id: user.id,
-        event_type: 'rls_diagnostic_test',
-        project_id: testProjectId,
-        is_test: true,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      errors.push(`INSERT failed: ${insertError.message} (code: ${insertError.code})`);
-    } else {
-      details.push(`INSERT success: Created event ${insertData.id}`);
-    }
-
-    // Test 2: SELECT with filter
-    details.push('Test 2: Attempting SELECT with is_test filter...');
-    const { data: selectData, error: selectError } = await supabase
-      .from('usage_events')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_test', true)
-      .order('created_at', { ascending: true });
-
-    if (selectError) {
-      errors.push(`SELECT failed: ${selectError.message} (code: ${selectError.code})`);
-    } else {
-      details.push(`SELECT success: Found ${selectData?.length || 0} test events`);
-    }
-
-    // Test 3: DELETE
-    details.push('Test 3: Attempting DELETE...');
-    const { error: deleteError } = await supabase
-      .from('usage_events')
-      .delete()
-      .eq('id', testEventId)
-      .eq('user_id', user.id)
-      .eq('is_test', true);
-
-    if (deleteError) {
-      errors.push(`DELETE failed: ${deleteError.message} (code: ${deleteError.code})`);
-    } else {
-      details.push(`DELETE success: Removed test event`);
-    }
-
-    return {
-      success: errors.length === 0,
-      details,
-      errors,
-    };
+  // Run with timeout protection
+  try {
+    return await Promise.race([
+      runTest(),
+      new Promise<{ success: boolean; details: string[]; errors: string[] }>((_, reject) =>
+        setTimeout(() => reject(new Error('RLS test timeout after 15 seconds')), TIMEOUT)
+      ),
+    ]);
   } catch (error: any) {
-    errors.push(`Unexpected error: ${error.message}`);
+    errors.push(`Timeout or error: ${error.message}`);
     return { success: false, details, errors };
   }
 }
@@ -128,11 +144,21 @@ export async function testRLSPolicies(): Promise<{
  * The usage_events table requires user_id to reference auth.users(id)
  */
 async function createTestUser(): Promise<{ userId: string; email: string }> {
+  console.log('[createTestUser] Starting...');
   const timestamp = Date.now();
   const email = `${TEST_USER_PREFIX}+${timestamp}@goflexconnect.local`;
 
   // Get the current authenticated user (admin running the test)
-  const { data: { user } } = await supabase.auth.getUser();
+  console.log('[createTestUser] Getting current user from auth...');
+
+  const getUserPromise = supabase.auth.getUser();
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('getUser() timeout after 5 seconds')), 5000)
+  );
+
+  const { data: { user } } = await Promise.race([getUserPromise, timeoutPromise]) as any;
+
+  console.log('[createTestUser] Got user:', user?.id);
 
   if (!user) {
     throw new Error('No authenticated user found for self-test');
@@ -149,12 +175,20 @@ async function createTestUser(): Promise<{ userId: string; email: string }> {
  */
 async function deleteTestUser(userId: string, testStartTime?: number): Promise<void> {
   try {
-    // Delete all test events for this user
-    await supabase
+    console.log('[deleteTestUser] Deleting test events for user:', userId);
+
+    const deletePromise = supabase
       .from('usage_events')
       .delete()
       .eq('user_id', userId)
       .eq('is_test', true);
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('deleteTestUser() timeout after 5 seconds')), 5000)
+    );
+
+    await Promise.race([deletePromise, timeoutPromise]);
+    console.log('[deleteTestUser] Deletion completed');
   } catch (error) {
     console.warn('Failed to delete test user data:', error);
   }
@@ -870,9 +904,12 @@ export const TEST_SCENARIOS: TestScenario[] = [
  * Run specific tests
  */
 export async function runTests(testIds: string[]): Promise<TestResult[]> {
+  console.log('[runTests] STARTING - Test IDs:', testIds);
   const results: TestResult[] = [];
+  const TEST_TIMEOUT = 30000; // 30 seconds per test
 
   for (const testId of testIds) {
+    console.log(`[runTests] Running test: ${testId}`);
     const scenario = TEST_SCENARIOS.find((s) => s.id === testId);
     if (!scenario) {
       results.push({
@@ -886,21 +923,36 @@ export async function runTests(testIds: string[]): Promise<TestResult[]> {
     }
 
     try {
-      const result = await scenario.runner();
+      // Add timeout protection for each test
+      const result = await Promise.race([
+        scenario.runner(),
+        new Promise<TestResult>((_, reject) =>
+          setTimeout(() => reject(new Error('Test timeout after 30 seconds')), TEST_TIMEOUT)
+        ),
+      ]);
       results.push(result);
     } catch (error) {
       results.push({
         id: testId,
         name: scenario.name,
         status: 'FAIL',
-        details: `Uncaught error: ${error}`,
+        details: `Error: ${error}`,
         timestamp: new Date().toISOString(),
       });
     }
   }
 
-  // Cleanup any remaining test data
-  await cleanupTestData();
+  // Cleanup any remaining test data (with timeout)
+  try {
+    await Promise.race([
+      cleanupTestData(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Cleanup timeout')), 10000)
+      ),
+    ]);
+  } catch (error) {
+    console.warn('Cleanup failed or timed out:', error);
+  }
 
   return results;
 }
@@ -909,5 +961,6 @@ export async function runTests(testIds: string[]): Promise<TestResult[]> {
  * Run all tests
  */
 export async function runAllTests(): Promise<TestResult[]> {
+  console.log('[runAllTests] STARTING - Total scenarios:', TEST_SCENARIOS.length);
   return runTests(TEST_SCENARIOS.map((s) => s.id));
 }

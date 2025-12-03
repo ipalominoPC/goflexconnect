@@ -9,9 +9,8 @@ const corsHeaders = {
 
 // Admin email addresses - hardcoded for reliability
 const ADMIN_EMAILS = [
-  "ipalominopc@gmail.com",
+  "ipalomino@gmail.com",
   "isaac@goflexconnect.com",
-  "isaac@goflexcloud.com",
   "dev@goflexconnect.com",
 ];
 
@@ -130,20 +129,37 @@ Deno.serve(async (req: Request) => {
         "MIME-Version: 1.0",
         "Content-Type: text/html; charset=utf-8",
         "",
-        "<html>",
-        "<body>",
-        "<h2>Admin Email Test - SUCCESS</h2>",
-        `<p><strong>Test ID:</strong> ${testId}</p>`,
-        `<p><strong>Timestamp:</strong> ${timestamp}</p>`,
-        `<p><strong>Recipients:</strong> ${ADMIN_EMAILS.length} admin(s)</p>`,
-        "<hr>",
-        "<p>This is an automated test email from the GoFlexConnect Admin Dashboard.</p>",
-        "<p><em>If you received this, SMTP and admin email routing are working correctly.</em></p>",
-        "<p style='margin-top: 20px; color: #666; font-size: 12px;'>",
-        "GoFlexConnect Admin System",
-        "</p>",
-        "</body>",
-        "</html>",
+        `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="background-color:#ffffff;max-width:600px;margin:0 auto;padding:24px;">
+    <img
+      src="https://raw.githubusercontent.com/ipalominoPC/goflexconnect/main/public/icons/logo-128.png"
+      alt="GoFlexConnect"
+      width="80"
+      height="80"
+      style="display:block; margin:0 auto 20px auto; border:0; outline:none; text-decoration:none;"
+    />
+    <div style="font-size: 28px; font-weight: bold; color: #1a1a1a; padding-bottom: 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      GoFlexConnect Admin
+    </div>
+    <h2>Admin Email Test - SUCCESS</h2>
+    <p><strong>Test ID:</strong> ${testId}</p>
+    <p><strong>Timestamp:</strong> ${timestamp}</p>
+    <p><strong>Recipients:</strong> ${ADMIN_EMAILS.length} admin(s)</p>
+    <hr>
+    <p>This is an automated test email from the GoFlexConnect Admin Dashboard.</p>
+    <p><em>If you received this, SMTP and admin email routing are working correctly.</em></p>
+    <p style="margin-top: 20px; color: #666; font-size: 12px;">
+      GoFlexConnect Admin System
+    </p>
+  </div>
+</body>
+</html>`,
         ".",
       ].join("\r\n");
 

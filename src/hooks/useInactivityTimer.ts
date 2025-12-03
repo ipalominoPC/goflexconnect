@@ -27,7 +27,7 @@ export function useInactivityTimer(config: InactivityTimerConfig = {}): Inactivi
   } = config;
 
   const [isWarningShown, setIsWarningShown] = useState(false);
-  const [lastActivityTime, setLastActivityTime] = useState(Date.now());
+  const lastActivityTimeRef = useRef(Date.now());
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const logoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const warningShownRef = useRef(false);
@@ -57,9 +57,12 @@ export function useInactivityTimer(config: InactivityTimerConfig = {}): Inactivi
 
   const resetTimer = useCallback(() => {
     const now = Date.now();
-    setLastActivityTime(now);
-    setIsWarningShown(false);
-    warningShownRef.current = false;
+    lastActivityTimeRef.current = now;
+
+    if (warningShownRef.current) {
+      setIsWarningShown(false);
+      warningShownRef.current = false;
+    }
 
     // Clear existing timers
     if (warningTimerRef.current) {
@@ -144,7 +147,7 @@ export function useInactivityTimer(config: InactivityTimerConfig = {}): Inactivi
   return {
     isWarningShown,
     resetTimer,
-    lastActivityTime,
+    lastActivityTime: lastActivityTimeRef.current,
   };
 }
 

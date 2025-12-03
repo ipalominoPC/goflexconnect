@@ -156,6 +156,8 @@ export async function getTestUsageSummary(params: {
   const limits = getLimitsForPlan(planId);
 
   try {
+    console.log('[getTestUsageSummary] Starting query for user:', userId);
+
     // Get start of current month
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -164,14 +166,29 @@ export async function getTestUsageSummary(params: {
     todayStart.setUTCHours(0, 0, 0, 0);
     const todayStartISO = todayStart.toISOString();
 
-    // Fetch ONLY test usage events for this user
-    const { data: events, error } = await supabase
+    // Fetch ONLY test usage events for this user with timeout protection
+    console.log('[getTestUsageSummary] Executing query...');
+    const startTime = Date.now();
+
+    const queryPromise = supabase
       .from('usage_events')
       .select('*')
       .eq('user_id', userId)
       .eq('is_test', true);
 
-    if (error) throw error;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout after 10 seconds')), 10000)
+    );
+
+    const { data: events, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+
+    const queryTime = Date.now() - startTime;
+    console.log(`[getTestUsageSummary] Query completed in ${queryTime}ms, found ${events?.length || 0} events`);
+
+    if (error) {
+      console.error('[getTestUsageSummary] Query error:', error);
+      throw error;
+    }
 
     // Calculate project count (unique project_created events)
     const projectEvents = events?.filter((e) => e.event_type === 'project_created') || [];
