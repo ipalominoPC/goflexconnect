@@ -1,177 +1,78 @@
-import { Plus, MapPin, Calendar, Radio, ArrowLeft, Shield } from 'lucide-react';
+import { Plus, MapPin, Calendar, ChevronRight, Archive, FolderOpen } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { createSampleProjects, createSampleMeasurements } from '../services/mockData';
-import AdSlot from './AdSlot';
-import UsageNoticeBar from './UsageNoticeBar';
-import { useState, useEffect } from 'react';
-import UpgradeProModal from './UpgradeProModal';
-import { supabase } from '../services/supabaseClient';
-import { isAdminEmail } from '../config/admin';
+import { useState } from 'react';
 
-interface ProjectListProps {
-  onCreateProject: () => void;
-  onSelectProject: (projectId: string) => void;
-  onBack: () => void;
-}
-
-export default function ProjectList({ onCreateProject, onSelectProject, onBack }: ProjectListProps) {
+export default function ProjectList({ onCreateProject, onSelectProject, onBack }: any) {
   const projects = useStore((state) => state.projects);
-  const measurements = useStore((state) => state.measurements);
-  const addProject = useStore((state) => state.addProject);
-  const addMeasurement = useStore((state) => state.addMeasurement);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
 
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        setIsAdmin(isAdminEmail(user.email));
-      }
-    };
-    checkAdmin();
-  }, []);
+  const activeProjects = projects.filter(p => (p.status || 'active') === 'active');
+  const closedProjects = projects.filter(p => p.status === 'closed');
 
-  const loadSampleData = () => {
-    const sampleProjects = createSampleProjects();
-    sampleProjects.forEach((project) => {
-      addProject(project);
-      const sampleMeasurements = createSampleMeasurements(project.id);
-      sampleMeasurements.forEach(addMeasurement);
-    });
-  };
-
-  const getProjectMeasurementCount = (projectId: string) => {
-    return measurements.filter((m) => m.projectId === projectId).length;
-  };
-
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const ProjectCard = ({ p, isClosed }: { p: any, isClosed?: boolean }) => (
+    <button onClick={() => onSelectProject(p.id)} className={`w-full relative bg-gradient-to-r from-slate-900/80 to-slate-900/40 border border-white/5 rounded-[32px] p-7 text-left transition-all active:scale-[0.97] hover:border-[#27AAE1]/40 group overflow-hidden ${isClosed ? 'opacity-60 grayscale' : ''}`}>
+      <div className={`absolute left-0 top-0 w-1.5 h-full ${isClosed ? 'bg-slate-500' : 'bg-[#27AAE1] shadow-[4px_0_15px_rgba(39,170,225,0.6)]'} opacity-80`} />
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="text-2xl font-black group-hover:text-[#27AAE1] transition-colors leading-tight mb-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>{p.name}</h3>
+          <div className="flex items-center gap-1.5 text-slate-400 font-bold text-[10px] tracking-[0.2em] uppercase">
+             <MapPin className="w-3 h-3" /> {p.location || 'SITE SITE'}
+          </div>
+        </div>
+        <ChevronRight className="w-6 h-6 text-slate-700 group-hover:text-[#27AAE1] transition-all" />
+      </div>
+      <div className="flex items-center gap-6 pt-2">
+         <div className="flex flex-col">
+            <span className="text-[9px] text-slate-500 font-black uppercase tracking-tighter">Status</span>
+            <span className={`text-xs font-bold ${isClosed ? 'text-slate-400' : 'text-[#27AAE1]'}`}>{isClosed ? 'ARCHIVED' : 'ACTIVE'}</span>
+         </div>
+         <div className="flex flex-col border-l border-white/10 pl-6">
+            <span className="text-[9px] text-slate-500 font-black uppercase tracking-tighter">Created</span>
+            <span className="text-xs font-bold text-slate-300">{new Date(p.createdAt).toLocaleDateString()}</span>
+         </div>
+      </div>
+    </button>
+  );
 
   return (
-    <>
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <button
-          onClick={onBack}
-          className="mb-6 flex items-center text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Menu
-        </button>
-        <div className="flex items-center justify-between mb-12">
-          <div className="flex items-center gap-3">
-            <img
-              src="/icons/logo-128.png"
-              alt="GoFlexConnect logo"
-              className="h-12 w-12 rounded-2xl"
-            />
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  GoFlexConnect
-                </h1>
-                {isAdmin && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold rounded-full shadow-sm">
-                    <Shield className="w-3.5 h-3.5" />
-                    Admin Mode
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Signal survey platform
-              </p>
-            </div>
+    <div className="min-h-screen bg-black text-white p-6 pt-12 font-sans">
+      <div className="flex items-center justify-between mb-12">
+        <div className="flex items-center gap-4">
+          <div className="p-2.5 bg-[#27AAE1]/10 rounded-2xl border border-[#27AAE1]/30 shadow-[0_0_15px_rgba(39,170,225,0.5)]">
+            <img src="/icons/logo-128.png" className="w-8 h-8 rounded-lg shadow-[0_0_5px_rgba(39,170,225,1)]" alt="Logo" />
           </div>
+          <h1 className="text-2xl font-black tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>GoFlexConnect</h1>
         </div>
-
-        {/* Usage Notices */}
-        <div className="mb-6">
-          <UsageNoticeBar
-            context={{ type: 'dashboard' }}
-            onUpgrade={() => setShowUpgradeModal(true)}
-          />
-        </div>
-
-        {projects.length === 0 && (
-          <div className="bg-white dark:bg-slate-900/90 rounded-2xl p-12 text-center mb-6 border border-slate-200 dark:border-slate-800 shadow-lg transition-colors duration-300 ease-in-out">
-            <div className="w-20 h-20 bg-gradient-to-br from-goflex-blue to-goflex-blue-dark rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-goflex-blue/20">
-              <MapPin className="w-10 h-10 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-              You don't have any projects yet
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6 text-base max-w-md mx-auto">
-              Start by creating a site or building to survey. You can add floors, run speed tests, and collect RF measurements.
-            </p>
-            <button
-              onClick={onCreateProject}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-goflex-blue to-goflex-blue-dark text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-goflex-blue/25 transition-all duration-200 mb-4"
-            >
-              <Plus className="w-5 h-5" />
-              Create your first project
-            </button>
-            <div className="mt-4">
-              <button
-                onClick={loadSampleData}
-                className="text-goflex-blue hover:text-goflex-blue-dark text-sm font-semibold transition-colors"
-              >
-                Load sample data for testing
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="grid gap-5 mb-8">
-          {projects.map((project) => (
-            <button
-              key={project.id}
-              onClick={() => onSelectProject(project.id)}
-              className="group bg-white dark:bg-slate-900/90 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 hover:border-goflex-blue/30 hover:shadow-lg hover:shadow-goflex-blue/5 transition-all duration-300 ease-in-out text-left"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 group-hover:text-goflex-blue transition-colors">{project.name}</h3>
-                  {project.location && (
-                    <div className="flex items-center text-base text-slate-600 dark:text-slate-400">
-                      <MapPin className="w-4 h-4 mr-2" />
-                      {project.location}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6 text-sm">
-                <div className="flex items-center text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 rounded-lg">
-                  <Radio className="w-4 h-4 mr-2 text-goflex-blue" />
-                  <span className="font-semibold">{getProjectMeasurementCount(project.id)}</span>
-                  <span className="ml-1.5">measurements</span>
-                </div>
-                <div className="flex items-center text-slate-500 dark:text-slate-400">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  {formatDate(project.updatedAt)}
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={onCreateProject}
-          className="w-full bg-gradient-to-r from-goflex-blue to-goflex-blue-dark text-white rounded-2xl py-5 text-lg font-semibold hover:shadow-xl hover:shadow-goflex-blue/25 hover:scale-[1.01] transition-all duration-200 flex items-center justify-center gap-3"
-        >
-          <Plus className="w-6 h-6" />
-          New Project
+        <button onClick={onCreateProject} className="p-3 bg-[#27AAE1] rounded-xl shadow-lg shadow-[#27AAE1]/20 active:scale-95">
+          <Plus className="w-6 h-6 text-white" />
         </button>
-
-        <AdSlot placement="dashboard-footer" />
       </div>
 
-      {/* Upgrade Modal */}
-      {showUpgradeModal && (
-        <UpgradeProModal onClose={() => setShowUpgradeModal(false)} />
-      )}
-    </>
+      <div className="space-y-5 pb-20">
+        {activeProjects.length === 0 ? (
+           <p className="text-center text-slate-600 font-bold py-10 uppercase text-[10px] tracking-widest">No Active Projects</p>
+        ) : (
+          activeProjects.map((p) => <ProjectCard key={p.id} p={p} />)
+        )}
+
+        {closedProjects.length > 0 && (
+          <div className="mt-12 pt-8 border-t border-white/10">
+            <button 
+              onClick={() => setShowClosed(!showClosed)}
+              className="w-full flex items-center justify-center gap-2 bg-slate-900/50 py-4 rounded-2xl text-slate-400 font-black text-[10px] uppercase tracking-[0.3em] border border-white/5 shadow-inner"
+            >
+              {showClosed ? <FolderOpen className="w-4 h-4 text-[#27AAE1]" /> : <Archive className="w-4 h-4" />}
+              {showClosed ? 'Hide Archive' : `View Closed Projects (${closedProjects.length})`}
+            </button>
+            
+            {showClosed && (
+              <div className="space-y-5 mt-6">
+                {closedProjects.map((p) => <ProjectCard key={p.id} p={p} isClosed />)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

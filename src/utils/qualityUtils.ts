@@ -1,215 +1,48 @@
-import { Measurement, ThresholdConfig } from '../types';
+import { Measurement, Thresholds } from '../types';
 
-export type QualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+export type QualityBucket = 'excellent' | 'good' | 'fair' | 'poor';
 
-export type QualityBucket = 'Excellent' | 'Good' | 'Fair' | 'Poor' | 'NoService';
+export function getQualityBucket(m: Measurement, thresholds: Thresholds): QualityBucket {
+  const rsrp = m.rsrp;
+  const rsrq = m.rsrq;
+  const sinr = m.sinr || 0;
 
-export interface QualityInput {
-  avgRsrp?: number | null;
-  avgSinr?: number | null;
-  sampleCount?: number | null;
-}
-
-export function getQualityBucket({
-  avgRsrp,
-  avgSinr,
-  sampleCount,
-}: QualityInput): QualityBucket {
-  if (!sampleCount || sampleCount <= 0 || avgRsrp == null || avgSinr == null) {
-    return 'NoService';
-  }
-
-  if (avgRsrp <= -120) {
-    return 'NoService';
-  }
-
-  if (avgRsrp >= -90 && avgSinr >= 10) {
-    return 'Excellent';
-  }
-
-  if (avgRsrp >= -100 && avgSinr >= 5) {
-    return 'Good';
-  }
-
-  if (avgRsrp >= -110 && avgSinr >= 0) {
-    return 'Fair';
-  }
-
-  return 'Poor';
+  // Senior RF Engineer Thresholds (Prioritizing DAS Requirements)
+  // Excellent: Strong Power AND High Quality
+  if (rsrp >= -90 && rsrq >= -10 && sinr >= 15) return 'excellent';
+  
+  // Good: Acceptable Power AND Quality
+  if (rsrp >= -95 && rsrq >= -13 && sinr >= 10) return 'good';
+  
+  // Fair: Marginal Power (Yellow Zone)
+  if (rsrp >= -105 && rsrq >= -18 && sinr >= 5) return 'fair';
+  
+  // Poor: Anything below -105 RSRP or -18 RSRQ (Red Zone)
+  return 'poor';
 }
 
 export function getQualityBucketColor(bucket: QualityBucket): string {
-  switch (bucket) {
-    case 'Excellent':
-      return 'bg-green-100 text-green-800 border-green-200';
-    case 'Good':
-      return 'bg-sky-100 text-sky-800 border-sky-200';
-    case 'Fair':
-      return 'bg-amber-100 text-amber-800 border-amber-200';
-    case 'Poor':
-      return 'bg-red-100 text-red-800 border-red-200';
-    case 'NoService':
-      return 'bg-gray-100 text-gray-800 border-gray-200';
-  }
-}
-
-export interface QualityResult {
-  level: QualityLevel;
-  color: string;
-  bgColor: string;
-  label: string;
-  icon: string;
-}
-
-export function getSignalQuality(
-  measurement: Measurement,
-  thresholds: ThresholdConfig
-): QualityResult {
-  const { rsrp, sinr } = measurement;
-
-  if (rsrp >= thresholds.rsrp.good && sinr >= thresholds.sinr.good) {
-    return {
-      level: 'excellent',
-      color: 'text-green-400',
-      bgColor: 'bg-green-500/20',
-      label: 'Excellent',
-      icon: '🟢',
-    };
-  }
-
-  if (rsrp >= thresholds.rsrp.good || sinr >= thresholds.sinr.good) {
-    return {
-      level: 'good',
-      color: 'text-blue-400',
-      bgColor: 'bg-blue-500/20',
-      label: 'Good',
-      icon: '🔵',
-    };
-  }
-
-  if (rsrp >= thresholds.rsrp.fair || sinr >= thresholds.sinr.fair) {
-    return {
-      level: 'fair',
-      color: 'text-yellow-400',
-      bgColor: 'bg-yellow-500/20',
-      label: 'Fair',
-      icon: '🟡',
-    };
-  }
-
-  if (rsrp < -110 || sinr < -5) {
-    return {
-      level: 'critical',
-      color: 'text-red-600',
-      bgColor: 'bg-red-600/20',
-      label: 'Critical',
-      icon: '🔴',
-    };
-  }
-
-  return {
-    level: 'poor',
-    color: 'text-orange-400',
-    bgColor: 'bg-orange-500/20',
-    label: 'Poor',
-    icon: '🟠',
+  const colors = {
+    excellent: 'text-white', // Changed to white for better visibility on blue
+    good: 'text-white',
+    fair: 'text-white',
+    poor: 'text-white'
   };
+  return colors[bucket];
 }
 
-export function getRSRPQuality(rsrp: number, thresholds: ThresholdConfig): QualityResult {
-  if (rsrp >= thresholds.rsrp.good) {
-    return {
-      level: 'excellent',
-      color: 'text-green-400',
-      bgColor: 'bg-green-500/20',
-      label: 'Excellent',
-      icon: '🟢',
-    };
-  }
-  if (rsrp >= thresholds.rsrp.fair) {
-    return {
-      level: 'fair',
-      color: 'text-yellow-400',
-      bgColor: 'bg-yellow-500/20',
-      label: 'Fair',
-      icon: '🟡',
-    };
-  }
-  if (rsrp < -110) {
-    return {
-      level: 'critical',
-      color: 'text-red-600',
-      bgColor: 'bg-red-600/20',
-      label: 'Critical',
-      icon: '🔴',
-    };
-  }
-  return {
-    level: 'poor',
-    color: 'text-orange-400',
-    bgColor: 'bg-orange-500/20',
-    label: 'Poor',
-    icon: '🟠',
+export function getSignalQuality(m: Measurement, thresholds: Thresholds) {
+  const bucket = getQualityBucket(m, thresholds);
+  const styles = {
+    excellent: { label: 'EXCELLENT', color: 'text-white', bgColor: 'bg-green-500', border: 'border-green-400' },
+    good: { label: 'GOOD', color: 'text-white', bgColor: 'bg-emerald-500', border: 'border-emerald-400' },
+    fair: { label: 'MARGINAL', color: 'text-white', bgColor: 'bg-yellow-500', border: 'border-yellow-400' },
+    poor: { label: 'POOR', color: 'text-white', bgColor: 'bg-red-500', border: 'border-red-400' }
   };
+  return styles[bucket];
 }
 
-export function getSINRQuality(sinr: number, thresholds: ThresholdConfig): QualityResult {
-  if (sinr >= thresholds.sinr.good) {
-    return {
-      level: 'excellent',
-      color: 'text-green-400',
-      bgColor: 'bg-green-500/20',
-      label: 'Excellent',
-      icon: '🟢',
-    };
-  }
-  if (sinr >= thresholds.sinr.fair) {
-    return {
-      level: 'fair',
-      color: 'text-yellow-400',
-      bgColor: 'bg-yellow-500/20',
-      label: 'Fair',
-      icon: '🟡',
-    };
-  }
-  if (sinr < -5) {
-    return {
-      level: 'critical',
-      color: 'text-red-600',
-      bgColor: 'bg-red-600/20',
-      label: 'Critical',
-      icon: '🔴',
-    };
-  }
-  return {
-    level: 'poor',
-    color: 'text-orange-400',
-    bgColor: 'bg-orange-500/20',
-    label: 'Poor',
-    icon: '🟠',
-  };
-}
-
-export function getComplianceStatus(
-  rsrp: number,
-  sinr: number
-): { passes: boolean; message: string } {
-  const rsrpPasses = rsrp >= -95;
-  const sinrPasses = sinr >= 0;
-
-  if (rsrpPasses && sinrPasses) {
-    return {
-      passes: true,
-      message: 'Meets NFPA 1221 requirements',
-    };
-  }
-
-  const issues: string[] = [];
-  if (!rsrpPasses) issues.push(`RSRP ${rsrp.toFixed(1)} dBm (needs ≥ -95)`);
-  if (!sinrPasses) issues.push(`SINR ${sinr.toFixed(1)} dB (needs ≥ 0)`);
-
-  return {
-    passes: false,
-    message: `Fails: ${issues.join(', ')}`,
-  };
+export function getComplianceStatus(rsrp: number, sinr: number) {
+  if (rsrp >= -95 && (sinr || 0) >= 10) return { passes: true, message: 'Meets FCC/Carrier Specs' };
+  return { passes: false, message: 'Below Carrier Minimums' };
 }

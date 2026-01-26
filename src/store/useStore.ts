@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { Project, Floor, Measurement, Settings } from '../types';
 import type { User } from '@supabase/supabase-js';
 import { offlineStorage } from '../services/offlineStorage';
+import { syncService } from '../services/syncService';
 
 interface AppState {
   projects: Project[];
@@ -174,7 +175,7 @@ export const useStore = create<AppState>()(
         get().floors.filter((f) => f.projectId === projectId),
 
       addMeasurement: (measurement) => {
-        offlineStorage.saveMeasurement(measurement).catch(console.error);
+        offlineStorage.saveMeasurement(measurement).then(() => syncService.syncWithServer()).catch(console.error);
         set((state) => ({
           measurements: [...state.measurements, measurement],
         }));
@@ -226,3 +227,4 @@ export const useStore = create<AppState>()(
     }
   )
 );
+

@@ -1,4 +1,4 @@
-import { Radio, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -6,38 +6,41 @@ interface SplashScreenProps {
 
 export default function SplashScreen({ onComplete }: SplashScreenProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-goflex-blue via-goflex-blue to-goflex-blue-dark flex flex-col items-center justify-center px-6 animate-fadeIn">
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6 animate-fadeIn">
       <div className="text-center">
-        <div className="mb-8 animate-scaleIn text-center">
-          <div className="flex justify-center mb-6">
+        <div className="mb-12 animate-scaleIn text-center">
+          <div className="flex justify-center mb-8">
             <img
               src="/icons/logo-512.png"
               alt="GoFlexConnect logo"
-              className="h-32 w-32 rounded-[32px] shadow-xl shadow-cyan-500/40"
+              className="h-28 w-28 rounded-[28px] shadow-[0_0_30px_rgba(39,170,225,0.4)] border border-[#27AAE1]/20"
             />
           </div>
-          <h1 className="text-5xl font-bold text-white mb-6" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+          <h1 className="text-4xl font-black text-white mb-2 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
             GoFlexConnect
           </h1>
+          <p className="text-[#27AAE1] text-[10px] font-bold uppercase tracking-[0.4em] opacity-80">RF Intelligence</p>
         </div>
 
         <div className="animate-slideUp">
-
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-              <Radio className="w-7 h-7 text-white" />
-            </div>
+          {/* ANIMATED SIGNAL BARS */}
+          <div className="flex items-end justify-center gap-1.5 mb-12 h-10">
+            <div className="signal-bar delay-1 w-2 h-3 shadow-[0_0_10px_#27AAE1]"></div>
+            <div className="signal-bar delay-2 w-2 h-5 shadow-[0_0_10px_#27AAE1]"></div>
+            <div className="signal-bar delay-3 w-2 h-7 shadow-[0_0_10px_#27AAE1]"></div>
+            <div className="signal-bar delay-4 w-2 h-9 shadow-[0_0_10px_#27AAE1]"></div>
+            <div className="signal-bar delay-5 w-2 h-11 shadow-[0_0_10px_#27AAE1]"></div>
           </div>
 
-          <p className="text-xl text-white/90 font-medium max-w-md mx-auto leading-relaxed mb-12">
-            Professional cellular signal survey and heatmap visualization tool
+          <p className="text-sm text-slate-400 font-medium max-w-xs mx-auto leading-relaxed mb-12 uppercase tracking-widest" style={{ fontFamily: 'Roboto, sans-serif' }}>
+            Professional cellular signal survey and heatmap tool
           </p>
 
           <button
             onClick={onComplete}
-            className="group bg-white text-goflex-blue px-8 py-4 rounded-2xl font-semibold text-lg shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 flex items-center gap-3 mx-auto"
+            className="group bg-[#27AAE1] text-white px-10 py-4 rounded-2xl font-black text-lg shadow-[0_0_25px_rgba(39,170,225,0.4)] active:scale-95 transition-all duration-300 flex items-center gap-3 mx-auto"
           >
-            Get Started
+            GET STARTED
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>

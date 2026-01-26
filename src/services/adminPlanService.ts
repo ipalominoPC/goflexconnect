@@ -31,7 +31,7 @@ export interface UserWithPlan {
  */
 export async function listUsersWithPlans(): Promise<UserWithPlan[]> {
   // Get all users from auth.users (admin only)
-  const { data: usersData, error: usersError } = await supabase.rpc('get_all_users_admin');
+  const { data: usersData, error: usersError } = await supabase.rpc('admin_get_users_with_plans');
 
   if (usersError) {
     // Fallback: If RPC doesn't exist, just return empty
@@ -151,3 +151,4 @@ export async function getPlanOverride(userId: string): Promise<PlanOverride | nu
 
   return data;
 }
+

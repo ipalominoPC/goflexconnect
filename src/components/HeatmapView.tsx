@@ -35,8 +35,8 @@ export default function HeatmapView({ projectId, floorId, onBack }: HeatmapViewP
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
-    if (!canvasRef.current || viewMode !== 'heatmap') return;
+    useEffect(() => {
+    if (!canvasRef.current || viewMode !== 'heatmap' || measurements.length === 0) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -44,24 +44,48 @@ export default function HeatmapView({ projectId, floorId, onBack }: HeatmapViewP
 
     const width = canvas.width;
     const height = canvas.height;
-
     ctx.clearRect(0, 0, width, height);
 
-    measurements.forEach((measurement) => {
-      const x = measurement.x * width;
-      const y = measurement.y * height;
-      const value = getMetricValue(measurement, selectedMetric);
-      const color = getColorForValue(value, selectedMetric, settings.thresholds);
+    // RF Optimization: Use a grid-based IDW (Inverse Distance Weighting)
+    // to simulate signal "bleed" between points.
+    const gridSize = 8; // Performance vs Quality balance
+    const p = 2; // Power factor for distance decay (RF standard)
 
-      const opacityHex = Math.floor(opacity * 255).toString(16).padStart(2, '0');
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, interpolationRadius);
-      gradient.addColorStop(0, color + opacityHex);
-      gradient.addColorStop(0.5, color + Math.floor(opacity * 0.4 * 255).toString(16).padStart(2, '0'));
-      gradient.addColorStop(1, color + '00');
+    for (let x = 0; x < width; x += gridSize) {
+      for (let y = 0; y < height; y += gridSize) {
+        let weightedSum = 0;
+        let totalWeight = 0;
+        let closestDist = Infinity;
 
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
-    });
+        measurements.forEach((m) => {
+          const mx = m.x * width;
+          const my = m.y * height;
+          const dist = Math.sqrt((x - mx) ** 2 + (y - my) ** 2);
+
+          if (dist < interpolationRadius) {
+            // IDW Formula: weight = 1 / distance^p
+            const weight = 1 / Math.pow(dist + 1, p);
+            weightedSum += getMetricValue(m, selectedMetric) * weight;
+            totalWeight += weight;
+            if (dist < closestDist) closestDist = dist;
+          }
+        });
+
+        if (totalWeight > 0) {
+          const interpolatedValue = weightedSum / totalWeight;
+          const color = getColorForValue(interpolatedValue, selectedMetric, settings.thresholds);
+          
+          // Apply a subtle fade-out at the edges of the interpolation radius
+          const edgeAlpha = Math.max(0, 1 - (closestDist / interpolationRadius));
+          const finalAlpha = opacity * edgeAlpha;
+          
+          ctx.fillStyle = color;
+          ctx.globalAlpha = finalAlpha;
+          ctx.fillRect(x, y, gridSize, gridSize);
+        }
+      }
+    }
+    ctx.globalAlpha = 1.0;
 
     if (showContours) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
@@ -365,3 +389,4 @@ export default function HeatmapView({ projectId, floorId, onBack }: HeatmapViewP
     </div>
   );
 }
+

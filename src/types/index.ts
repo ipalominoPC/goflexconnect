@@ -11,7 +11,7 @@ export interface Project {
   floorPlanImage?: string;
   floorPlanFilename?: string;
   createdAt: number;
-  updatedAt: number;
+  updatedAt: number; status?: "active" | "closed";
 }
 
 export interface DonorAlignment {
@@ -64,7 +64,7 @@ export interface Floor {
   gridSize?: number;
   gridEnabled?: boolean;
   createdAt: number;
-  updatedAt: number;
+  updatedAt: number; status?: "active" | "closed";
 }
 
 export interface GridPoint {
@@ -88,6 +88,9 @@ export interface Measurement {
   rssi: number;
   cellId: string;
   techType: 'LTE' | '5G' | '4G' | 'EDGE' | 'HSPA';
+  latitude?: number;
+  longitude?: number;
+  band?: string;
   timestamp: number;
   photoId?: string;
   photoCaption?: string;
@@ -187,3 +190,4 @@ export interface SurveyInsight {
   improvementNotes?: any;
   createdAt: string;
 }
+

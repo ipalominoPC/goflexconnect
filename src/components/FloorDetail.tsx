@@ -203,7 +203,7 @@ export default function FloorDetail({
             onClick={onStartSurvey}
             className="bg-gradient-to-r from-goflex-blue to-goflex-blue-dark text-white rounded-2xl py-5 text-lg font-semibold hover:shadow-xl hover:shadow-goflex-blue/25 hover:scale-[1.01] transition-all duration-200 flex items-center justify-center gap-3"
           >
-            <Radio className="w-6 h-6" />
+            <div className="p-2 bg-[#27AAE1]/10 rounded-xl border border-[#27AAE1]/20 shadow-[0_0_10px_rgba(39,170,225,0.4)]"><Radio className="w-6 h-6 text-[#27AAE1] drop-shadow-[0_0_8px_rgba(39,170,225,0.8)]" /></div>
             Start Survey Mode
           </button>
 

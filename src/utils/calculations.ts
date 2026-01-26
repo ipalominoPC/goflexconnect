@@ -97,16 +97,21 @@ export function getColorForValue(
 }
 
 export function exportToCSV(measurements: Measurement[]): string {
-  const headers = ['Location', 'timestamp', 'rsrp', 'rsrq', 'sinr', 'rssi', 'cellId', 'techType'];
+  // RF Engineering Headers
+  const headers = ['Location_ID', 'Timestamp', 'Tech', 'CID', 'Band', 'RSRP', 'RSRQ', 'SINR', 'RSSI', 'X_Coord', 'Y_Coord', 'Lat', 'Long'];
+  
   const rows = measurements.map((m) => [
     m.locationNumber,
     new Date(m.timestamp).toISOString(),
+    m.techType, m.cid || 'N/A', m.band || 'N/A',
     m.rsrp,
     m.rsrq,
     m.sinr,
     m.rssi,
-    m.cellId,
-    m.techType,
+    m.x.toFixed(4),
+    m.y.toFixed(4),
+    m.latitude || 'N/A',
+    m.longitude || 'N/A'
   ]);
 
   return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -127,3 +132,4 @@ export function downloadFile(content: string, filename: string, type: string) {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+

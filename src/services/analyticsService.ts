@@ -75,39 +75,16 @@ export async function upsertSurveyInsight(
 }
 
 export async function generateSurveyInsights(surveyId: string): Promise<SurveyInsight> {
-  const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-insights`;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  const token = localStorage.getItem('sb-rqxamghddsgdjlxtrbvu-auth-token');
-  let authToken = anonKey;
-
-  if (token) {
-    try {
-      const parsed = JSON.parse(token);
-      if (parsed?.access_token) {
-        authToken = parsed.access_token;
-      }
-    } catch (e) {
-      console.warn('Failed to parse auth token:', e);
-    }
-  }
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'Content-Type': 'application/json',
-      'apikey': anonKey,
-    },
-    body: JSON.stringify({ surveyId }),
+  const { supabase } = await import("./supabaseClient");
+  
+  const { data, error } = await supabase.functions.invoke("generate-insights", {
+    body: { surveyId },
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `Failed to generate insights: ${response.status}`);
+  if (error) {
+    console.error("AI Function Error:", error);
+    throw new Error(error.message || "Failed to generate insights");
   }
-
-  const data = await response.json();
 
   return {
     id: data.id,

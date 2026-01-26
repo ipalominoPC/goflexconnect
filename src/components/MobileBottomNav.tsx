@@ -15,8 +15,8 @@ export default function MobileBottomNav({ currentView, onNavigate }: MobileBotto
   ];
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 z-50 safe-area-inset-bottom">
-      <div className="flex justify-around items-center h-16 pb-safe">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 z-50 safe-area-inset-bottom">
+      <div className="flex justify-around items-center h-24 pb-8 pb-safe">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -40,3 +40,10 @@ export default function MobileBottomNav({ currentView, onNavigate }: MobileBotto
     </nav>
   );
 }
+
+
+
+
+
+
+

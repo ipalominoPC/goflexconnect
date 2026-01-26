@@ -1,53 +1,36 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
-@layer base {
-  body {
-    background-color: #020617;
-    color: #ffffff;
-  }
+:root {
+  font-family: 'Roboto', sans-serif;
+  letter-spacing: -0.01em; /* Tesla style tight kerning */
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+body {
+  font-family: 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* Ensure Montserrat stays ONLY for the Branded Elements we defined earlier */
+.branded-logo-text {
+  font-family: 'Montserrat', sans-serif !important;
+}
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap');  @tailwind base; @tailwind components; @tailwind utilities;  html, body { overflow-x: hidden; width: 100%; margin: 0; padding: 0; background-color: #0F172A; } #root { width: 100%; } h1, h2, h3, .font-black { font-family: 'Montserrat', sans-serif !important; } 
+
+
+
+@keyframes signal-pulse {
+  0%, 100% { opacity: 0.3; transform: scaleY(1); }
+  50% { opacity: 1; transform: scaleY(1.1); filter: drop-shadow(0 0 8px #27AAE1); }
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.signal-bar {
+  background-color: #27AAE1;
+  border-radius: 2px;
+  animation: signal-pulse 1.5s infinite ease-in-out;
 }
 
-.animate-fadeIn {
-  animation: fadeIn 0.6s ease-out;
-}
-
-.animate-scaleIn {
-  animation: scaleIn 0.8s ease-out;
-}
-
-.animate-slideUp {
-  animation: slideUp 0.8s ease-out 0.3s both;
-}
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.3s; }
+.delay-3 { animation-delay: 0.5s; }
+.delay-4 { animation-delay: 0.7s; }
+.delay-5 { animation-delay: 0.9s; }

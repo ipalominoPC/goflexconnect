@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, MapPin, Wifi, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Activity, MapPin, Wifi, AlertCircle, CheckCircle } from 'lucide-react';
 import {
   getCurrentLocation,
   watchLocation,
@@ -27,13 +27,13 @@ import {
 interface LiveSurveyModeProps {
   projectId: string;
   floorId?: string;
-  onMeasurementSaved?: (measurement: any) => void;
+  onBack, onMeasurementSaved?: (measurement: any) => void; onBack: () => void;
 }
 
 export default function LiveSurveyMode({ 
   projectId, 
   floorId,
-  onMeasurementSaved 
+  onBack, onMeasurementSaved 
 }: LiveSurveyModeProps) {
   // State
   const [isActive, setIsActive] = useState(false);
@@ -189,8 +189,8 @@ export default function LiveSurveyMode({
       // For now, just add to local state
       setMeasurements(prev => [...prev, measurement]);
       
-      if (onMeasurementSaved) {
-        onMeasurementSaved(measurement);
+      if (onBack, onMeasurementSaved) {
+        onBack, onMeasurementSaved(measurement);
       }
       
       // Visual feedback
@@ -209,7 +209,7 @@ export default function LiveSurveyMode({
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Live Survey</h2>
+        <div className="flex items-center gap-3"><button onClick={onBack} className="p-1 -ml-1 text-gray-600 hover:text-gray-900 transition-colors"><ArrowLeft className="w-6 h-6" /></button><h2 className="text-lg font-semibold">Live Survey</h2></div>
         <div className="flex items-center gap-2">
           {isActive && (
             <span className="flex items-center gap-1 text-sm text-green-600">

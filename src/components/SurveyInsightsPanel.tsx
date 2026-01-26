@@ -188,7 +188,7 @@ export default function SurveyInsightsPanel({ surveyId }: SurveyInsightsPanelPro
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800">Error</p>
             <p className="text-sm text-red-600 mt-1">
-              {error.includes('Analytics not available')
+              {error ? error : error.includes('Analytics not available')
                 ? "We haven't finished processing analytics for this survey yet. Try again in a few minutes after the survey data has synced."
                 : "We couldn't generate insights for this survey. Please try again in a moment."}
             </p>
@@ -247,7 +247,7 @@ export default function SurveyInsightsPanel({ surveyId }: SurveyInsightsPanelPro
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50 mb-2">Recommended Next Action</h3>
-              <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p className="text-slate-900 dark:text-white font-medium leading-relaxed">
                 {recommendedAction}
               </p>
             </div>
@@ -296,15 +296,15 @@ export default function SurveyInsightsPanel({ surveyId }: SurveyInsightsPanelPro
         <div className="space-y-6">
 
           <div className="bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/10 rounded-xl p-6 border border-blue-100 dark:border-blue-900/50">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50 mb-3">Executive Summary</h3>
-            <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{insights.summary}</p>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-3">Executive Summary</h3>
+            <p className="text-slate-900 dark:text-white font-medium leading-relaxed whitespace-pre-wrap">{insights.summary}</p>
           </div>
 
           <div className="bg-gradient-to-br from-green-50 to-green-50/50 dark:from-green-950/30 dark:to-green-950/10 rounded-xl p-6 border border-green-100 dark:border-green-900/50">
             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50 mb-4">Recommendations</h3>
             <ul className="list-disc pl-5 space-y-2">
               {parseRecommendations(insights.recommendations).map((rec, index) => (
-                <li key={index} className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                <li key={index} className="text-slate-900 dark:text-white font-medium leading-relaxed">
                   {rec}
                 </li>
               ))}
@@ -418,3 +418,6 @@ export default function SurveyInsightsPanel({ surveyId }: SurveyInsightsPanelPro
     </>
   );
 }
+
+
+

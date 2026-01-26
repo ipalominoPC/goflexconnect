@@ -56,6 +56,7 @@ import FloorDetail from './components/FloorDetail';
 import FloorPlanUpload from './components/FloorPlanUpload';
 import FloorPlanUploadForFloor from './components/FloorPlanUploadForFloor';
 import SurveyMode from './components/SurveyMode';
+import LiveSurveyMode from './components/LiveSurveyMode';
 import HeatmapView from './components/HeatmapView';
 import SpeedTest from './components/SpeedTest';
 import Settings from './components/Settings';
@@ -692,7 +693,7 @@ function App() {
 
   return (
     <AppLayout showBottomNav>
-      <div className="relative">
+      <div className="relative w-full flex flex-col items-center">
         {/* Billing Phase Notice Banner - shown at top when user is logged in */}
         {user && <BillingPhaseNoticeBanner />}
 
@@ -747,3 +748,4 @@ function App() {
 }
 
 export default App;
+

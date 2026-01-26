@@ -22,7 +22,7 @@ export function Landing({ onGetAccess, onLogIn }: LandingProps) {
               <img
                 src="/icons/logo-96.png"
                 alt="GoFlexConnect logo"
-                className="h-8 w-8 rounded-lg"
+                className="h-8 w-8 rounded-lg shadow-[0_0_10px_rgba(39,170,225,0.8)] border border-[#27AAE1]/30"
               />
               <h1 className="text-xl font-bold text-white dark:text-white" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                 GoFlexConnect
@@ -133,8 +133,8 @@ export function Landing({ onGetAccess, onLogIn }: LandingProps) {
 
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-goflex-card rounded-xl p-8 border border-gray-800 hover:border-goflex-blue transition-colors">
-              <div className="bg-goflex-blue/10 w-14 h-14 rounded-lg flex items-center justify-center mb-6">
-                <Radio className="w-7 h-7 text-goflex-blue" />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 bg-[#27AAE1]/10 border border-[#27AAE1]/20 shadow-[0_0_15px_rgba(39,170,225,0.4)]">
+                <Radio className="w-7 h-7 text-[#27AAE1] drop-shadow-[0_0_5px_rgba(39,170,225,0.8)]" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">
                 4G & 5G Signal Scanning
@@ -146,8 +146,8 @@ export function Landing({ onGetAccess, onLogIn }: LandingProps) {
             </div>
 
             <div className="bg-goflex-card rounded-xl p-8 border border-gray-800 hover:border-goflex-blue transition-colors">
-              <div className="bg-goflex-blue/10 w-14 h-14 rounded-lg flex items-center justify-center mb-6">
-                <MapPin className="w-7 h-7 text-goflex-blue" />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 bg-[#27AAE1]/10 border border-[#27AAE1]/20 shadow-[0_0_15px_rgba(39,170,225,0.4)]">
+                <MapPin className="w-7 h-7 text-[#27AAE1] drop-shadow-[0_0_5px_rgba(39,170,225,0.8)]" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">
                 Live Heatmap Generation
@@ -159,8 +159,8 @@ export function Landing({ onGetAccess, onLogIn }: LandingProps) {
             </div>
 
             <div className="bg-goflex-card rounded-xl p-8 border border-gray-800 hover:border-goflex-blue transition-colors">
-              <div className="bg-goflex-blue/10 w-14 h-14 rounded-lg flex items-center justify-center mb-6">
-                <FolderKanban className="w-7 h-7 text-goflex-blue" />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 bg-[#27AAE1]/10 border border-[#27AAE1]/20 shadow-[0_0_15px_rgba(39,170,225,0.4)]">
+                <FolderKanban className="w-7 h-7 text-[#27AAE1] drop-shadow-[0_0_5px_rgba(39,170,225,0.8)]" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">
                 Project-Based Management

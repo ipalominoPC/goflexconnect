@@ -1,5 +1,5 @@
 import { useState, useRef, ReactNode } from 'react';
-import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, RefreshCcw } from 'lucide-react';
 
 interface ZoomableFloorPlanProps {
   children: ReactNode;
@@ -20,163 +20,112 @@ export default function ZoomableFloorPlan({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragMoved, setDragMoved] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
-  const handleZoomIn = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setScale((prev) => Math.min(prev + 0.25, 3));
-  };
+  const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
+  const [initialScale, setInitialScale] = useState(1);
+  const [lastTouchEnd, setLastTouchEnd] = useState(0);
 
-  const handleZoomOut = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setScale((prev) => Math.max(prev - 0.25, 0.5));
-  };
-
-  const handleReset = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const handleReset = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
+  const handleInteractionEnd = (clientX: number, clientY: number) => {
+    if (!dragMoved && allowClick && onCanvasClick && imageRef.current) {
+      const rect = imageRef.current.getBoundingClientRect();
+      
+      // Precision math: Map click to 0.0 - 1.0 within the visible image pixels
+      const x = (clientX - rect.left) / rect.width;
+      const y = (clientY - rect.top) / rect.height;
 
-    setIsDragging(true);
-    setDragMoved(false);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-
-    const newX = e.clientX - dragStart.x;
-    const newY = e.clientY - dragStart.y;
-
-    if (Math.abs(newX - position.x) > 2 || Math.abs(newY - position.y) > 2) {
-      setDragMoved(true);
-    }
-
-    setPosition({ x: newX, y: newY });
-  };
-
-  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-
-    setIsDragging(false);
-
-    if (!dragMoved && allowClick && onCanvasClick) {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      const adjustedX = (clickX - position.x) / scale;
-      const adjustedY = (clickY - position.y) / scale;
-
-      const normalizedX = adjustedX / rect.width;
-      const normalizedY = adjustedY / rect.height;
-
-      if (normalizedX >= 0 && normalizedX <= 1 && normalizedY >= 0 && normalizedY <= 1) {
-        onCanvasClick(normalizedX, normalizedY);
+      // HARD LOCK: Only trigger if the click is physically on the floor plan pixels
+      if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+        onCanvasClick(x, y);
       }
     }
   };
 
-  const handleMouseLeave = () => {
-    setIsDragging(false);
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      setInitialPinchDistance(Math.sqrt(dx * dx + dy * dy));
+      setInitialScale(scale);
+      setDragMoved(true);
+    } else if (e.touches.length === 1) {
+      setIsDragging(true);
+      setDragMoved(false);
+      setDragStart({ x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && initialPinchDistance !== null) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const currentDistance = Math.sqrt(dx * dx + dy * dy);
+      setScale(Math.max(1, Math.min(8, initialScale * (currentDistance / initialPinchDistance))));
+    } else if (e.touches.length === 1 && isDragging) {
+      setDragMoved(true);
+      setPosition({ x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y });
+    }
   };
 
   return (
-    <div className="flex-1 relative overflow-hidden bg-gray-900">
-      <div className="absolute top-4 right-4 z-50 flex flex-col gap-2">
-        <button
-          onClick={handleZoomIn}
-          className="w-10 h-10 bg-gray-800 hover:bg-gray-700 text-white rounded-lg flex items-center justify-center border border-gray-700 transition-colors shadow-lg"
-          aria-label="Zoom in"
-        >
-          <ZoomIn className="w-5 h-5" />
-        </button>
-        <button
-          onClick={handleZoomOut}
-          className="w-10 h-10 bg-gray-800 hover:bg-gray-700 text-white rounded-lg flex items-center justify-center border border-gray-700 transition-colors shadow-lg"
-          aria-label="Zoom out"
-        >
-          <ZoomOut className="w-5 h-5" />
-        </button>
-        <button
-          onClick={handleReset}
-          className="w-10 h-10 bg-gray-800 hover:bg-gray-700 text-white rounded-lg flex items-center justify-center border border-gray-700 transition-colors shadow-lg"
-          aria-label="Reset zoom"
-        >
-          <Maximize2 className="w-5 h-5" />
+    <div className="w-full h-full relative overflow-hidden bg-black touch-none flex items-center justify-center" ref={containerRef}>
+      {/* Zoom Controls */}
+      <div className="absolute top-4 right-4 z-50 flex flex-col gap-3">
+        <button onClick={(e) => { e.stopPropagation(); setScale(s => Math.min(s + 1, 8)); }} className="w-12 h-12 bg-slate-800/90 text-white rounded-xl border border-white/20 flex items-center justify-center shadow-2xl active:bg-[#27AAE1]"><ZoomIn className="w-6 h-6" /></button>
+        <button onClick={(e) => { e.stopPropagation(); setScale(s => Math.max(s - 1, 1)); }} className="w-12 h-12 bg-slate-800/90 text-white rounded-xl border border-white/20 flex items-center justify-center shadow-2xl active:bg-[#27AAE1]"><ZoomOut className="w-6 h-6" /></button>
+        <button onClick={(e) => { e.stopPropagation(); handleReset(); }} className="w-12 h-14 bg-[#27AAE1] text-white rounded-xl border border-[#27AAE1]/50 flex flex-col items-center justify-center shadow-[0_0_20px_rgba(39,170,225,0.4)] active:scale-95 transition-all">
+          <RefreshCcw className="w-5 h-5 mb-0.5" />
+          <span className="text-[8px] font-black">RESET</span>
         </button>
       </div>
 
       <div
-        ref={containerRef}
-        className={`absolute inset-0 ${allowClick ? 'cursor-crosshair' : 'cursor-grab'} ${
-          isDragging ? 'cursor-grabbing' : ''
-        }`}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        style={{
-          backgroundColor: floorPlanImage ? '#1f2937' : '#374151',
+        className="relative flex items-center justify-center"
+        onMouseDown={(e) => { if(e.button === 0) { setIsDragging(true); setDragMoved(false); setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y }); }}}
+        onMouseMove={(e) => { if(isDragging) { setDragMoved(true); setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); }}}
+        onMouseUp={(e) => { setIsDragging(false); handleInteractionEnd(e.clientX, e.clientY); }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={(e) => {
+          if (e.touches.length === 0) {
+            setInitialPinchDistance(null);
+            if (e.changedTouches.length === 1) {
+              const now = Date.now();
+              if (now - lastTouchEnd > 300) {
+                handleInteractionEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+              }
+              setLastTouchEnd(now);
+            }
+            setIsDragging(false);
+          }
         }}
+        style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, width: '100%', height: '100%' }}
       >
-        <div
-          style={{
-            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-            transformOrigin: '0 0',
-            width: '100%',
-            height: '100%',
-            transition: isDragging ? 'none' : 'transform 0.1s',
-            pointerEvents: 'none',
-          }}
-        >
-          {floorPlanImage && floorPlanImage.startsWith('data:application/pdf') ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-gray-800 rounded-xl p-8 max-w-md text-center border border-gray-700">
-                <p className="text-white text-lg font-semibold mb-2">PDF Floor Plan Detected</p>
-                <p className="text-gray-400 text-sm mb-4">
-                  For best results with zoom and measurements, please upload your floor plan as an image (PNG or JPG) instead of PDF.
-                </p>
-                <p className="text-gray-500 text-xs">
-                  You can convert PDFs to images using online tools or screenshot software.
-                </p>
-              </div>
+        {floorPlanImage ? (
+          <img
+            ref={imageRef}
+            src={floorPlanImage}
+            className="max-w-full max-h-full object-contain pointer-events-none select-none shadow-2xl"
+            alt="Map"
+            draggable={false}
+          />
+        ) : (
+          <div className="p-20 bg-slate-900 rounded-3xl border-2 border-dashed border-white/5 text-slate-700 font-black uppercase text-xs">No Floor Plan</div>
+        )}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            {/* This ensures dots and crosshairs stay relative to the image size */}
+            <div style={{ 
+                width: imageRef.current?.clientWidth || '100%', 
+                height: imageRef.current?.clientHeight || '100%',
+                position: 'relative' 
+            }}>
+                {children}
             </div>
-          ) : floorPlanImage ? (
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `url(${floorPlanImage})`,
-                backgroundSize: 'contain',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-              }}
-            />
-          ) : (
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `
-                  linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
-                `,
-                backgroundSize: '40px 40px',
-              }}
-            />
-          )}
-
-          {children}
         </div>
       </div>
     </div>

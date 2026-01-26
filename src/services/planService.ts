@@ -55,8 +55,8 @@ export async function resolveUserPlan(userId: string): Promise<ResolvedPlan> {
 
   // 2. Check for manual plan override in profiles table
   const { data: profile } = await supabase
-    .from('profiles')
-    .select('plan_override, plan_override_reason, plan_override_expires_at')
+    .from('plan_overrides')
+    .select('plan_id, reason, created_at')
     .eq('id', userId)
     .maybeSingle();
 
@@ -65,14 +65,14 @@ export async function resolveUserPlan(userId: string): Promise<ResolvedPlan> {
   let reason: string | undefined = undefined;
 
   // 3. Check if override is active (not expired)
-  if (profile?.plan_override) {
+  if (profile?.plan_id) {
     const isExpired = profile.plan_override_expires_at &&
                       new Date(profile.plan_override_expires_at) < new Date();
 
     if (!isExpired) {
-      resolvedPlan = normalizePlanId(profile.plan_override);
-      override = normalizePlanId(profile.plan_override);
-      reason = profile.plan_override_reason || undefined;
+      resolvedPlan = normalizePlanId(profile.plan_id);
+      override = normalizePlanId(profile.plan_id);
+      reason = profile.reason || undefined;
     }
   }
 
@@ -437,3 +437,4 @@ export async function trackAndEnforceSpeedTest(userId: string): Promise<void> {
     eventType: 'speed_test_run',
   });
 }
+
