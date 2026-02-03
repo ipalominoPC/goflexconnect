@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Users, Radio, LifeBuoy, Bot, Zap, RefreshCw, Activity, Play, AlertCircle, Wifi, Clock, ShieldAlert, BarChart3, Maximize2, Loader2, ShieldCheck, CheckCircle2, UserPlus, Globe, LayoutGrid, Database } from 'lucide-react';
+import { ArrowLeft, Users, Radio, LifeBuoy, Bot, Zap, RefreshCw, Activity, Play, AlertCircle, Wifi, Clock, ShieldAlert, BarChart3, Maximize2, Loader2, ShieldCheck, CheckCircle2, UserPlus, Globe, LayoutGrid, Database, Megaphone, Send, Power } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { fetchAdminSummaryStats } from '../services/adminMetrics';
 import { useStore } from '../store/useStore';
@@ -27,18 +27,36 @@ export default function AdminDashboard({ onBack }: any) {
     show: false, msg: '', type: 'success'
   });
 
+  // BROADCAST CONSOLE STATE
+  const [bcMessage, setBcMessage] = useState('');
+  const [bcType, setBcType] = useState<'info' | 'warning' | 'critical'>('info');
+  const [bcActive, setBcActive] = useState(false);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+
   useEffect(() => {
     loadMissionControlData();
+    loadCurrentAnnouncement();
     
     const radarChannel = supabase.channel('mission-radar-v4')
       .on('postgres_changes', { event: 'INSERT', table: 'measurements', schema: 'public' }, (payload) => {
         const newPing = payload?.new;
         if (newPing?.user_id && typeof newPing?.rsrp === 'number') {
-          setLiveTelemetry(prev => ({
-            ...prev,
-            [newPing.user_id]: [...(prev[newPing.user_id] || []), newPing.rsrp].slice(-20)
-          }));
-          addActivityLog('USAGE', `Tech ${newPing.user_id.slice(0,4)} is active.`);
+          // Task 2: Resolve Project Context for HQ Feed
+          const proj = projects?.find(p => p.id === newPing.project_id);
+          const location = proj ? proj.name : `Site ${newPing.project_id?.slice(0,4) || 'Unknown'}`;
+
+          setLiveTelemetry(prev => {
+            const isFirstPing = !prev[newPing.user_id] || prev[newPing.user_id].length === 0;
+            if (isFirstPing) {
+               triggerNotify(`NODE ACTIVE: ${location}`, 'success');
+            }
+            return {
+              ...prev,
+              [newPing.user_id]: [...(prev[newPing.user_id] || []), newPing.rsrp].slice(-20)
+            };
+          });
+          
+          addActivityLog('USAGE', `Signal Uplink: ${location} (${newPing.rsrp} dBm)`);
         }
       })
       .subscribe();
@@ -47,7 +65,7 @@ export default function AdminDashboard({ onBack }: any) {
       .on('postgres_changes', { event: 'INSERT', table: 'profiles', schema: 'public' }, (payload) => {
         const newUser = payload.new;
         triggerNotify(`NEW USER: ${newUser.email || 'Anonymous'}`, 'success');
-        addActivityLog('NEW_USER', `Account: ${newUser.email}`);
+        addActivityLog('NEW_USER', `Account Created: ${newUser.email || 'Unknown'}`);
         setRefreshTrigger(p => p + 1);
       })
       .subscribe();
@@ -57,10 +75,40 @@ export default function AdminDashboard({ onBack }: any) {
       supabase.removeChannel(radarChannel); 
       supabase.removeChannel(userChannel);
     };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, projects]);
+
+  const loadCurrentAnnouncement = async () => {
+    const { data } = await supabase.from('system_announcements').select('*').eq('id', '00000000-0000-0000-0000-000000000001').single();
+    if (data) {
+      setBcMessage(data.message);
+      setBcType(data.type);
+      setBcActive(data.is_active);
+    }
+  };
+
+  const handleUpdateBroadcast = async (shouldBeActive: boolean) => {
+    setIsBroadcasting(true);
+    try {
+      const { error } = await supabase.from('system_announcements').update({
+        message: bcMessage,
+        type: bcType,
+        is_active: shouldBeActive,
+        updated_at: new Date().toISOString()
+      }).eq('id', '00000000-0000-0000-0000-000000000001');
+
+      if (!error) {
+        setBcActive(shouldBeActive);
+        triggerNotify(shouldBeActive ? 'BROADCAST LIVE' : 'BROADCAST TERMINATED', 'success');
+      }
+    } catch (e) {
+      triggerNotify('BROADCAST FAILED', 'error');
+    } finally {
+      setIsBroadcasting(false);
+    }
+  };
 
   const addActivityLog = (type: 'USAGE' | 'NEW_USER' | 'SIMULATION', message: string) => {
-    setActivityFeed(prev => [{ id: Date.now(), type, message, time: new Date() }, ...prev].slice(0, 15));
+    setActivityFeed(prev => [{ id: Math.random(), type, message, time: new Date() }, ...prev].slice(0, 15));
   };
 
   const loadMissionControlData = async () => {
@@ -203,6 +251,52 @@ export default function AdminDashboard({ onBack }: any) {
           <div className="flex-1 flex flex-col lg:overflow-y-auto scrollbar-hide">
             {activeTab === 'remediation' && (
               <div className="flex flex-col">
+                {/* GLOBAL BROADCAST HUB (NEW) */}
+                <div className="p-6 border-b border-white/10 bg-[#27AAE1]/5">
+                   <h3 className="text-[10px] font-black text-[#27AAE1] uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                      <Megaphone size={12} /> Fleet Broadcast Hub
+                   </h3>
+                   <div className="space-y-3">
+                      <textarea 
+                        value={bcMessage}
+                        onChange={(e) => setBcMessage(e.target.value)}
+                        placeholder="Fleet-wide message..."
+                        className="w-full h-16 bg-black/50 border border-white/10 rounded-xl p-3 text-[11px] text-white placeholder:text-slate-700 outline-none focus:border-[#27AAE1]/40"
+                      />
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex gap-1">
+                          {(['info', 'warning', 'critical'] as const).map(type => (
+                            <button 
+                              key={type}
+                              onClick={() => setBcType(type)}
+                              className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-tighter border transition-all ${
+                                bcType === type 
+                                ? 'bg-white/10 border-[#27AAE1] text-[#27AAE1]' 
+                                : 'bg-black border-white/5 text-slate-600'
+                              }`}
+                            >
+                              {type}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                           <button 
+                             onClick={() => handleUpdateBroadcast(!bcActive)}
+                             disabled={isBroadcasting}
+                             className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${
+                               bcActive 
+                               ? 'bg-red-600/20 text-red-500 border border-red-600/40 shadow-[0_0_10px_rgba(220,38,38,0.2)]' 
+                               : 'bg-[#27AAE1] text-black shadow-[0_0_10px_#27AAE1]'
+                             }`}
+                           >
+                             {isBroadcasting ? <Loader2 size={12} className="animate-spin" /> : bcActive ? <Power size={12} /> : <Send size={12} />}
+                             {bcActive ? 'Kill Alert' : 'Broadcast'}
+                           </button>
+                        </div>
+                      </div>
+                   </div>
+                </div>
+
                 <div className="p-6 border-b border-white/5 flex flex-col bg-white/[0.01]">
                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                       <Globe size={12} className="text-[#27AAE1]" /> Network Activity

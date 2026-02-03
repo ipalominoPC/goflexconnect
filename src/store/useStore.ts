@@ -26,6 +26,13 @@ interface SignalState {
   timestamp: number;
 }
 
+// Global Announcement Type
+interface SystemAnnouncement {
+  message: string;
+  type: 'info' | 'warning' | 'critical';
+  is_active: boolean;
+}
+
 interface AppState {
   projects: Project[];
   floors: Floor[];
@@ -38,8 +45,10 @@ interface AppState {
   isAdmin: boolean;
   userRole: UserRole; // NEW: Persona Switch
   currentSignal: SignalState | null;
+  systemAnnouncement: SystemAnnouncement | null; // MISSION ALERT INFRASTRUCTURE
   setUser: (user: User | null) => void;
   setUserRole: (role: UserRole) => void; // NEW: Role Setter
+  setSystemAnnouncement: (announcement: SystemAnnouncement | null) => void; // MISSION ALERT SETTER
   clearUserData: () => void;
   setProjects: (projects: Project[]) => void;
   setFloors: (floors: Floor[]) => void;
@@ -79,6 +88,7 @@ export const useStore = create<AppState>()(
       isAdmin: false,
       userRole: 'Field Tech', // Default Persona
       currentSignal: null,
+      systemAnnouncement: null, // Initialized as null
       
       setUser: (user) => {
         const userEmail = user?.email?.toLowerCase() || '';
@@ -97,8 +107,10 @@ export const useStore = create<AppState>()(
       },
 
       setUserRole: (role) => set({ userRole: role }),
+      
+      setSystemAnnouncement: (announcement) => set({ systemAnnouncement: announcement }),
 
-      clearUserData: () => set({ projects: [], floors: [], measurements: [], currentProjectId: null, user: null, currentUserId: null, isAdmin: false, userRole: 'Field Tech' }),
+      clearUserData: () => set({ projects: [], floors: [], measurements: [], currentProjectId: null, user: null, currentUserId: null, isAdmin: false, userRole: 'Field Tech', systemAnnouncement: null }),
       setProjects: (projects) => set({ projects }),
       setFloors: (floors) => set({ floors }),
       setMeasurements: (measurements) => set({ measurements }),

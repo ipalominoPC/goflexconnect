@@ -135,26 +135,56 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
   const confirmUpload = async (name: string) => {
     if (!namingModal.data || isSaving) return;
     setIsSaving(true); setUploading(true);
-    const newFloor = { id: crypto.randomUUID(), project_id: projectId, name: name || 'Unnamed Floor', image_data: namingModal.data, created_at: new Date().toISOString() };
+    
+    const newFloor = { 
+      id: crypto.randomUUID(), 
+      project_id: projectId, 
+      name: name || 'Unnamed Floor', 
+      image_data: namingModal.data, 
+      created_at: new Date().toISOString() 
+    };
+
     try {
-      await supabase.from('floors').insert([newFloor]);
+      // TRUTH: Optimistic Update (Instant UI response)
       addFloor(newFloor);
       setSelectedFloorId(newFloor.id);
       setNamingModal({ show: false, data: null });
-    } catch (err) { console.error(err); } finally { setUploading(false); setIsSaving(false); }
+      setCustomFloorName('');
+      
+      // Stop blocking spinner immediately
+      setUploading(false);
+      setIsSaving(false);
+
+      // Background DB Sync: Do not 'await' this for heavy assets to prevent UI lock
+      supabase.from('floors').insert([newFloor]).then(({ error }) => {
+        if (error) console.error('[Background Sync Fail]', error);
+      });
+      
+    } catch (err) { 
+      console.error(err); 
+      setUploading(false); 
+      setIsSaving(false); 
+    }
   };
 
   const confirmPurge = async () => {
     try {
-      if (deleteModal.type === 'floor') {
-        await supabase.from('floors').delete().eq('id', deleteModal.id);
-        deleteFloor(deleteModal.id);
+      const { id, type } = deleteModal;
+      
+      // Optimistic UI Removal
+      if (type === 'floor') {
+        deleteFloor(id);
+        // Background DB call
+        supabase.from('floors').delete().eq('id', id).then();
       } else {
-        await db.deleteInstall(deleteModal.id);
+        await db.deleteInstall(id);
         setDonorPhotos(await db.getProjectInstalls(projectId));
       }
+      
       setDeleteModal({ show: false, id: '', name: '', type: 'floor' });
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+    }
   };
 
   const handleExport = async (type: 'PDF' | 'CSV' | 'DONOR') => {

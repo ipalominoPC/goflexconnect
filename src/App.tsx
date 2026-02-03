@@ -24,6 +24,7 @@ import OnlineStatus from './components/OnlineStatus';
 import SurveyMode from './components/SurveyMode';
 import HeatmapView from './components/HeatmapView';
 import CellTowerCompass from './components/CellTowerCompass';
+import { AlertCircle, ShieldAlert, Info, X } from 'lucide-react';
 
 type View =
   | { type: 'landing' } | { type: 'auth' } | { type: 'splash' } | { type: 'onboarding' } | { type: 'menu' }
@@ -38,6 +39,10 @@ function App() {
   const isAdmin = useStore((state) => state.isAdmin);
   const setUser = useStore((state) => state.setUser);
   const setProjects = useStore((state) => state.setProjects);
+  // MISSION ALERT STATE
+  const systemAnnouncement = useStore((state) => state.systemAnnouncement);
+  const setSystemAnnouncement = useStore((state) => state.setSystemAnnouncement);
+
   const [currentView, setCurrentView] = useState<View>({ type: 'landing' });
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -78,6 +83,36 @@ function App() {
     loadProjects();
   }, [user?.id, isAdmin, setProjects]);
 
+  // GLOBAL ANNOUNCEMENT REALTIME LISTENER
+  useEffect(() => {
+    const MASTER_ID = '00000000-0000-0000-0000-000000000001';
+
+    // 1. Initial Fetch
+    const getInitialAnnouncement = async () => {
+      const { data } = await supabase
+        .from('system_announcements')
+        .select('*')
+        .eq('id', MASTER_ID)
+        .single();
+      if (data) setSystemAnnouncement(data);
+    };
+    getInitialAnnouncement();
+
+    // 2. Realtime Subscription
+    const channel = supabase.channel('global-alerts')
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        table: 'system_announcements', 
+        schema: 'public',
+        filter: `id=eq.${MASTER_ID}`
+      }, (payload) => {
+        setSystemAnnouncement(payload.new as any);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [setSystemAnnouncement]);
+
   // VERIFIER: Shows system version during boot
   if (!authChecked) return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
@@ -97,8 +132,34 @@ function App() {
     else setCurrentView({ type: view as any });
   };
 
+  const getAnnouncementStyle = (type: string) => {
+    switch(type) {
+      case 'critical': return 'bg-red-600/20 border-red-500/50 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.2)]';
+      case 'warning': return 'bg-orange-600/20 border-orange-500/50 text-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.2)]';
+      default: return 'bg-[#27AAE1]/10 border-[#27AAE1]/30 text-[#27AAE1] shadow-[0_0_20px_rgba(39,170,225,0.1)]';
+    }
+  };
+
   return (
     <AppLayout showBottomNav={['menu', 'projectList', 'speedTest', 'settings', 'admin', 'cellTowerCompass'].includes(currentView.type)}>
+      
+      {/* GLOBAL SYSTEM ANNOUNCEMENT BANNER */}
+      {systemAnnouncement?.is_active && (
+        <div className={`w-full px-6 py-3 border-b backdrop-blur-md flex items-center gap-4 animate-in slide-in-from-top duration-500 sticky top-0 z-[2000] ${getAnnouncementStyle(systemAnnouncement.type)}`}>
+           <div className="shrink-0">
+              {systemAnnouncement.type === 'critical' ? <ShieldAlert size={18} /> : systemAnnouncement.type === 'warning' ? <AlertCircle size={18} /> : <Info size={18} />}
+           </div>
+           <p className="text-[10px] font-black uppercase tracking-widest leading-tight flex-1">
+              {systemAnnouncement.message}
+           </p>
+           {isAdmin && (
+             <button onClick={() => setSystemAnnouncement({ ...systemAnnouncement, is_active: false })} className="p-1 hover:opacity-50 transition-opacity">
+                <X size={14} />
+             </button>
+           )}
+        </div>
+      )}
+
       <div className="pt-2"><OnlineStatus /></div>
       <FlexBot />
       {user && <BillingPhaseNoticeBanner />}
@@ -131,7 +192,6 @@ function App() {
           <AdminRouteGuard onUnauthorized={() => setCurrentView({ type: 'menu' })}>
             <AdminDashboard 
               onBack={() => setCurrentView({ type: 'menu' })} 
-              // FIXED: Removed the global navigation call to keep AdminDashboard in Command mode
               onViewProject={(id: string) => console.log('[Truth] Internal selection handled by Dashboard')} 
             />
           </AdminRouteGuard>

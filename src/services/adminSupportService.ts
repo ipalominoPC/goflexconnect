@@ -1,8 +1,8 @@
 /**
- * Admin Support Service (v4.4 Truth Edition)
+ * Admin Support Service (v4.5 Truth Edition)
  * 
  * Synchronized with Supabase Schema:
- * id, user_id, user_email, subject, status, priority, message, project_id, admin_reply, ticket_number
+ * id, user_id, user_email, subject, status, priority, message, project_id, admin_reply, ticket_number, conversation_id
  */
 
 import { supabase } from './supabaseClient';
@@ -19,6 +19,7 @@ export interface AdminTicketListItem {
   user_email: string | null; // Database column is 'user_email'
   project_id: string | null;
   admin_reply: string | null;
+  conversation_id: string | null; // TASK 1: For Intelligence Audit (Transcript Linking)
 }
 
 /**
@@ -60,21 +61,57 @@ export async function getAllTickets(): Promise<AdminTicketListItem[]> {
 
 /**
  * SEND TACTICAL INSTRUCTION (Admin Action)
+ * Task 1: Supports persisting conversation_id for Intelligence Audits
  */
-export async function addAdminReply(ticketId: string, reply: string) {
+export async function addAdminReply(ticketId: string, reply: string, conversationId?: string) {
   try {
+    const updatePayload: any = { 
+      admin_reply: reply,
+      status: 'in-review',
+      updated_at: new Date().toISOString()
+    };
+
+    if (conversationId) {
+      updatePayload.conversation_id = conversationId;
+    }
+
     const { error } = await supabase
       .from('support_tickets')
-      .update({ 
-        admin_reply: reply,
-        status: 'in-review',
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', ticketId);
 
     return { success: !error, error };
   } catch (err) {
     return { success: false, error: err };
+  }
+}
+
+/**
+ * TASK 3: SALES ENGINE FINALIZATION
+ * Creates a record in system_quotes when a "Zap" (Remediation) is actioned.
+ */
+export async function createRemediationQuote(ticket: AdminTicketListItem, estimatedValue: number = 0) {
+  try {
+    const { data, error } = await supabase
+      .from('system_quotes')
+      .insert([{
+        ticket_id: ticket.id,
+        user_id: ticket.user_id,
+        project_id: ticket.project_id,
+        user_email: ticket.user_email,
+        subject: `REMEDIATION: ${ticket.subject}`,
+        quote_amount: estimatedValue,
+        status: 'pending_review',
+        metadata: {
+          original_ticket_no: ticket.ticket_number,
+          priority: ticket.priority
+        }
+      }])
+      .select();
+
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err };
   }
 }
 
@@ -103,6 +140,7 @@ export async function injectSimulationTicket(userId: string, email: string) {
     user_id: userId,
     user_email: email,
     project_id: '00000000-0000-0000-0000-000000000000',
+    conversation_id: `conv_${Math.random().toString(36).slice(2, 11)}`, // Mock for Intelligence Audit
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
