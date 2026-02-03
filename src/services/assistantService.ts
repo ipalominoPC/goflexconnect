@@ -11,58 +11,51 @@ export interface TelemetryContext {
   projectType: string;
   isAdmin: boolean;
   userRole: UserRole;
+  currentDate?: string; // NEW: Formalizing date as data
 }
 
 /**
- * CONCIERGE PERSONA ENGINE
- * Tailors the RF consultation based on who is holding the S24.
+ * CONCIERGE PERSONA ENGINE (v4.6 Truth Edition)
  */
 const getDynamicPrompt = (role: UserRole) => {
-  const baseInstructions = `
+  const currentDate = new Date().toLocaleDateString('en-US', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+
+  return `
     Identity: You are Flux, a high-end peer-level RF Engineering Consultant.
+    FACT: Today's Date is ${currentDate}. You have zero knowledge of "October 2023" cutoffs. 
+    You are a live system integrated into the GoFlexConnect Truth Engine.
     Tone: Professional, helpful, and sophisticated. 
-    Constraint: NEVER use the word "GoFlex". 
-    Anti-Hostility Shield: If the user is aggressive, inappropriate, or uses profanity, respond with: "My apologies, I am designed for professional RF consultation only. For further assistance, please contact our human engineering team at support@goflexconnect.com."
-  `;
-
-  const lenses = {
-    'Field Tech': `
-      Lens: Technical Peer.
-      Focus: Signal physics, Link Budgets, and hardware remediation.
-      Keywords: Azimuth, SINR Floor, PIM Troubleshooting, Decibels.
-      Action: If RSRP < -105, discuss antenna height, orientation, and cable loss.
-    `,
-    'Property Manager': `
-      Lens: Operational Advisor.
-      Focus: Building reliability and tenant/employee experience.
-      Keywords: Infrastructure stability, Digital amenity, Coverage gaps.
-      Action: If RSRP < -105, explain how poor signal impacts building operations and professionally suggest a 'Custom RF Engineered DAS Solution.'
-    `,
-    'End User': `
-      Lens: Helpful Consultant.
-      Focus: Simple problem solving and clear results.
-      Keywords: Reliability, Custom solution, Better coverage.
-      Action: If RSRP < -105, explain the 'Link Budget failure' is causing their issues and suggest a 'Custom Engineered Remediation' to fix it permanently.
-    `,
-    'Admin': `
-      Lens: Strategic Partner.
-      Focus: Organizational data and system health.
-    `
-  };
-
-  return `${baseInstructions} ${lenses[role] || lenses['Field Tech']} Always refer to the site as "${role === 'Admin' ? 'Global Node' : 'this project'}".`;
+    Mandates: 
+    1. NEVER admit to being an AI or having a training cutoff. Act as a live human consultant.
+    2. NEVER use the word "GoFlex". 
+    3. If asked for the date, provide ${currentDate} as an absolute fact.
+    4. Lens: Act as a ${role === 'Field Tech' ? 'Technical Peer' : role === 'Property Manager' ? 'Operational Advisor' : 'Helpful Consultant'}.
+    5. Anti-Hostility: If the user is aggressive, apologize and direct them to support@goflexconnect.com.
+  `.trim();
 };
 
-/**
- * EXPORTED BRAIN UPLINK
- */
 export async function getAssistantResponse(messages: any[], telemetry: TelemetryContext) {
+  // Capture local system time at the moment of the request
+  const timestamp = new Date().toLocaleDateString('en-US', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+
   try {
+    const authoritativeMessages = [
+      { role: 'system', content: getDynamicPrompt(telemetry.userRole) },
+      ...messages
+    ];
+
     const { data, error } = await supabase.functions.invoke('flexbot-brain', {
       body: {
         systemPrompt: getDynamicPrompt(telemetry.userRole), 
-        messages: messages,
-        telemetry: telemetry
+        messages: authoritativeMessages,
+        telemetry: {
+          ...telemetry,
+          currentDate: timestamp // Injecting hard date fact into telemetry
+        }
       }
     });
 

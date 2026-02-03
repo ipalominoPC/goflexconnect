@@ -1,37 +1,48 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, X, UserCircle, Briefcase, HelpCircle } from 'lucide-react';
+import { Send, X, UserCircle, Briefcase, HelpCircle, Lock, ShieldCheck } from 'lucide-react';
 import { useStore, UserRole } from '../../store/useStore';
 import { Capacitor } from '@capacitor/core';
 import { getCellularSignal } from '../../services/cellularSignalService';
 import { getAssistantResponse } from '../../services/assistantService';
+import { generateUUID } from '../../utils/uuid'; 
 import './FlexBot.css';
 
 export default function FlexBot() {
-  const { projects, currentProjectId, measurements, settings, isAdmin, userRole, setUserRole } = useStore();
+  const { projects, currentProjectId, measurements, settings, isAdmin, user, userRole, setUserRole } = useStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false); 
+  
+  // SESSION GOVERNANCE
   const [messages, setMessages] = useState<any[]>([]);
+  const [conversationId, setConversationId] = useState<string>('');
   const [input, setInput] = useState('');
   const [status, setStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isNative = Capacitor.isNativePlatform();
-
   const activeProject = projects.find(p => p.id === currentProjectId);
 
   useEffect(() => { 
-    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
+    if (isOpen) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (!conversationId) setConversationId(generateUUID());
+    }
   }, [messages, isOpen, status]);
 
   const selectProtocol = (role: UserRole) => {
-    // Selection ripple delay
-    setTimeout(() => {
-      setUserRole(role);
-      setIsInitialized(true);
-      setMessages([{ 
-        role: 'assistant', 
-        content: `Hi, I'm Flux. I've established a secure link to your ${activeProject?.name || 'site'} data. How would you like me to guide you through your RF environment today?` 
-      }]);
-    }, 300);
+    setUserRole(role);
+    setIsInitialized(true);
+    
+    // TRUTH v4.6: Dynamic Date Injection in Greeting
+    // This anchors the AI's temporal awareness from the first message.
+    const today = new Date().toLocaleDateString('en-US', { 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    });
+
+    setMessages([{ 
+      role: 'assistant', 
+      content: `Hi, I'm Flux. Today is ${today}. Secure link established for ${activeProject?.name || 'this mission'}. How shall we proceed with your RF strategy?` 
+    }]);
   };
 
   const handleSend = async () => {
@@ -60,8 +71,14 @@ export default function FlexBot() {
       rsrpTarget: settings.rsrpTarget,
       projectName: activeProject?.name || 'Unnamed Mission',
       projectType: activeProject?.type || 'RF Survey',
+      projectId: currentProjectId,
+      userEmail: user?.email,      
+      userRole: userRole,
       isAdmin: isAdmin,
-      userRole: userRole
+      currentDate: new Date().toLocaleDateString('en-US', { 
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+      }),
+      conversationId: conversationId
     };
 
     const userMsg = { role: 'user', content: input };
@@ -83,21 +100,24 @@ export default function FlexBot() {
               <div className="absolute inset-0 bg-[#27AAE1] rounded-full blur-md animate-pulse opacity-50" />
               <img src="/chatpill.svg" className="w-full h-full relative z-10" alt="Flux" />
             </div>
-            <span className="text-xs font-black text-white/90 tracking-widest italic uppercase">Ask Consultant</span>
+            <span className="text-[11px] font-bold text-white/90 tracking-tight italic uppercase">Ask Consultant</span>
           </button>
         </div>
       )}
 
       {isOpen && (
         <div className="w-[340px] h-[550px] bg-black border border-white/10 rounded-[2.5rem] shadow-[0_0_60px_rgba(0,0,0,1)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-          {/* HEADER: Animated Avatar & Branded Mixed Case */}
+          
           <div className="p-6 bg-white/5 border-b border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-4">
                <div className="flux-avatar-container">
                 <img src="/flexbot/avatar-face.png" className="flux-face-img" alt="Flux" />
                </div>
                <div>
-                <p className="text-base font-black text-white italic leading-none">Flux</p>
+                <p className="text-base font-black text-white italic leading-none flex items-center gap-1.5">
+                    Flux 
+                    <span className="text-[8px] bg-[#27AAE1]/20 text-[#27AAE1] px-1 rounded font-bold">v4.6</span>
+                </p>
                 <p className="text-[10px] text-[#27AAE1] font-black mt-1.5 uppercase tracking-widest">RF Intelligence</p>
                </div>
             </div>
@@ -105,6 +125,7 @@ export default function FlexBot() {
           </div>
 
           <div className="flex-1 relative overflow-hidden flex flex-col">
+            
             {!isInitialized && (
               <div className="protocol-overlay">
                 <div className="mb-8 text-center px-4">
@@ -139,6 +160,7 @@ export default function FlexBot() {
                   </div>
                 </div>
               ))}
+              
               {status === 'thinking' && (
                 <div className="flex justify-start">
                   <div className="fb-message-bot px-5 py-3 flex items-center gap-2">
@@ -153,8 +175,20 @@ export default function FlexBot() {
             </div>
 
             <div className="p-5 bg-white/5 border-t border-white/5 flex gap-3">
-              <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} disabled={!isInitialized} className="flex-1 bg-black border border-white/10 rounded-2xl px-5 py-3 text-[13px] text-white outline-none focus:border-[#27AAE1]/40 placeholder:text-slate-800 disabled:opacity-20" placeholder="Ask your consultant..." />
-              <button onClick={handleSend} disabled={!isInitialized || status === 'thinking'} className="bg-white text-black px-5 rounded-2xl active:scale-90 transition-all disabled:opacity-20 shadow-xl">
+              <input 
+                type="text" 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)} 
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+                disabled={!isInitialized} 
+                className="flex-1 bg-black border border-white/10 rounded-2xl px-5 py-3 text-[13px] text-white outline-none focus:border-[#27AAE1]/40 placeholder:text-slate-800 disabled:opacity-20" 
+                placeholder="Ask your consultant..." 
+              />
+              <button 
+                onClick={handleSend} 
+                disabled={!isInitialized || status === 'thinking'} 
+                className="bg-white text-black px-5 rounded-2xl active:scale-90 transition-all disabled:opacity-20 shadow-xl"
+              >
                 <Send size={18} />
               </button>
             </div>
