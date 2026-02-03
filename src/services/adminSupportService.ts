@@ -1,74 +1,116 @@
 /**
- * Admin Support Service
- *
- * Provides admin-level access to support tickets.
- * Uses RLS policies that grant admins full access based on email.
+ * Admin Support Service (v4.4 Truth Edition)
+ * 
+ * Synchronized with Supabase Schema:
+ * id, user_id, user_email, subject, status, priority, message, project_id, admin_reply, ticket_number
  */
 
 import { supabase } from './supabaseClient';
 
 export interface AdminTicketListItem {
   id: string;
-  ticket_number: string;
-  category: string;
+  ticket_number: string | null;
+  priority: string | null; // Database column is 'priority'
   subject: string | null;
-  message: string;
-  status: string;
+  message: string | null;
+  status: string | null;
   created_at: string;
   user_id: string | null;
-  name: string;
-  email: string;
+  user_email: string | null; // Database column is 'user_email'
+  project_id: string | null;
+  admin_reply: string | null;
 }
 
 /**
  * Get all tickets for a specific user
- * Admin users will have full access via RLS policies
  */
 export async function getTicketsForUser(userId: string): Promise<AdminTicketListItem[]> {
   try {
-    console.log('[AdminSupportService] Fetching tickets for user:', userId);
-
     const { data, error } = await supabase
       .from('support_tickets')
-      .select('id, ticket_number, category, subject, message, status, created_at, user_id, name, email')
+      .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('[AdminSupportService] Error loading tickets:', error);
-      throw error;
-    }
-
-    console.log('[AdminSupportService] Loaded tickets:', data?.length || 0);
-    return data || [];
+    if (error) throw error;
+    return (data as AdminTicketListItem[]) || [];
   } catch (err) {
-    console.error('[AdminSupportService] Failed to fetch user tickets:', err);
+    console.error('[AdminSupportService] User fetch failed:', err);
     throw err;
   }
 }
 
 /**
  * Get all tickets (admin only)
- * Only works for admin users via RLS policies
  */
 export async function getAllTickets(): Promise<AdminTicketListItem[]> {
   try {
-    console.log('[AdminSupportService] Fetching all tickets (admin only)');
-
     const { data, error } = await supabase
       .from('support_tickets')
-      .select('id, ticket_number, category, subject, message, status, created_at, user_id, name, email')
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('[AdminSupportService] Error loading all tickets:', error);
-      throw error;
-    }
-
-    console.log('[AdminSupportService] Loaded all tickets:', data?.length || 0);
-    return data || [];
+    if (error) throw error;
+    return (data as AdminTicketListItem[]) || [];
   } catch (err) {
-    console.error('[AdminSupportService] Failed to fetch all tickets:', err);
+    console.error('[AdminSupportService] Global fetch failed:', err);
     throw err;
   }
+}
+
+/**
+ * SEND TACTICAL INSTRUCTION (Admin Action)
+ */
+export async function addAdminReply(ticketId: string, reply: string) {
+  try {
+    const { error } = await supabase
+      .from('support_tickets')
+      .update({ 
+        admin_reply: reply,
+        status: 'in-review',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', ticketId);
+
+    return { success: !error, error };
+  } catch (err) {
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Update ticket status
+ */
+export async function updateTicketStatus(ticketId: string, status: string) {
+  const { error } = await supabase
+    .from('support_tickets')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', ticketId);
+  return { error };
+}
+
+/**
+ * TRUTH SIMULATION PROTOCOL
+ * Injects a test "Zap" using verified schema columns.
+ */
+export async function injectSimulationTicket(userId: string, email: string) {
+  const mockTicket = {
+    ticket_number: `SIM-${Math.floor(1000 + Math.random() * 9000)}`,
+    priority: 'REMEDIATION',
+    subject: 'SIMULATED SIGNAL CRITICAL',
+    message: 'AUTOMATED RF ALERT: Critical signal gap detected (-115dBm). Hardware remediation suggested.',
+    status: 'new',
+    user_id: userId,
+    user_email: email,
+    project_id: '00000000-0000-0000-0000-000000000000',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await supabase
+    .from('support_tickets')
+    .insert([mockTicket])
+    .select();
+
+  return { data, error };
 }

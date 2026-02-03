@@ -113,6 +113,8 @@ class SyncService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Load projects
       const { data: projects } = await supabase.from('projects').select('*').eq('user_id', user.id);
       if (projects) {
         useStore.getState().setProjects(projects.map(p => ({
@@ -121,7 +123,34 @@ class SyncService {
           createdAt: new Date(p.created_at).getTime(), updatedAt: new Date(p.updated_at).getTime(),
         })));
       }
+
+      // Load floors
+      const { data: floors } = await supabase.from('floors').select('*').eq('user_id', user.id);
+      if (floors) {
+        useStore.getState().setFloors(floors.map(f => ({
+          id: f.id, projectId: f.project_id, name: f.name, level: f.level,
+          floorPlanImage: f.floor_plan_image, gridSize: f.grid_size,
+          createdAt: new Date(f.created_at).getTime(), updatedAt: new Date(f.updated_at).getTime(),
+        })));
+      }
+
+      // Load measurements
+      const { data: measurements } = await supabase.from('measurements').select('*').eq('user_id', user.id);
+      if (measurements) {
+        useStore.getState().setMeasurements(measurements.map(m => ({
+          id: m.id, projectId: m.project_id, floorId: m.floor_id,
+          x: m.x, y: m.y, locationNumber: m.location_number,
+          rsrp: m.rsrp, rsrq: m.rsrq, sinr: m.sinr, rssi: m.rssi,
+          cellId: m.cell_id, techType: m.tech_type, carrierName: m.carrier_name || 'Unknown',
+          latitude: m.latitude, longitude: m.longitude, band: m.band,
+          timestamp: new Date(m.timestamp).getTime(),
+        })));
+      }
+
+      console.log('[SyncService] Loaded from server:', { projects: projects?.length, floors: floors?.length, measurements: measurements?.length });
     } catch (error) { console.error('Load error:', error); }
   }
 }
 export const syncService = new SyncService();
+
+

@@ -1,198 +1,217 @@
-import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Crosshair, Wifi, MapPin, Radio as RadioIcon, AlertTriangle } from 'lucide-react';
+﻿import { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Crosshair, Wifi, Radio as RadioIcon, Trash2, Database, AlertTriangle, Activity } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { getCellularSignal, watchCellularSignal, clearSignalWatch } from '../services/cellularSignalService';
-import { getCurrentLocation, watchLocation, clearLocationWatch, requestLocationPermissions } from '../services/deviceService';
+import { startSignalMonitoring, getCellularSignal } from '../services/cellularSignalService';
+import { requestLocationPermissions } from '../services/deviceService';
 import { Measurement } from '../types';
 import ZoomableFloorPlan from './ZoomableFloorPlan';
 import { generateUUID } from '../utils/uuid';
 import { getSignalQuality } from '../utils/qualityUtils';
-import { trackUsageEvent } from '../services/usageTracking';
 
-const getCarrierLogo = (carrier: string | null) => {
-  if (!carrier) return null;
-  const name = carrier.toLowerCase();
-  if (name.includes('verizon')) return <span className="bg-red-600 text-white px-1.5 rounded font-black text-[10px] mr-1">VZ</span>;
-  if (name.includes('at&t') || name.includes('at & t')) return <span className="bg-blue-500 text-white px-1.5 rounded font-black text-[10px] mr-1">ATT</span>;
-  if (name.includes('t-mobile') || name.includes('tmobile')) return <span className="bg-[#E20074] text-white px-1.5 rounded font-black text-[10px] mr-1">T-MO</span>;
-  return <span className="text-[#27AAE1] font-bold mr-1">{carrier}</span>;
+const RFSparkline = ({ data, color, min, max }: { data: number[], color: string, min: number, max: number }) => {
+  if (!data || data.length < 2) return <div className="h-4 w-full bg-slate-800/20 rounded mt-1" />;
+  const width = 100;
+  const height = 20;
+  const points = data.map((val, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const normalized = Math.min(Math.max((val - min) / (max - min), 0), 1);
+    const y = height - (normalized * height);
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <div className="h-6 w-full opacity-90 mt-1">
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
+        <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} />
+      </svg>
+    </div>
+  );
 };
 
-interface SurveyModeProps {
-  projectId: string;
-  floorId?: string;
-  onBack: () => void;
-}
+export default function SurveyMode({ projectId, floorId, onBack }: any) {
+  // LINK TO CURRENT SIGNAL IN STORE
+  const { projects, floors, measurements: allMs, addMeasurement, deleteMeasurement, settings, currentSignal } = useStore();
 
-export default function SurveyMode({ projectId, floorId, onBack }: SurveyModeProps) {
-  const { projects, floors, measurements: allMeasurements, addMeasurement, settings, user } = useStore();
   const project = projects.find((p) => p.id === projectId);
-  const floor = floorId ? floors.find((f) => f.id === floorId) : undefined;
-  const mapImage = floor?.floorPlanImage || project?.floorPlanImage;
+  const floor = floors.find((f) => f.id === floorId);
+  const mapImage = floor?.image_data || floor?.floorPlanImage || project?.floorPlanImage;
 
-  const measurements = floorId
-    ? allMeasurements.filter((m) => m.floorId === floorId)
-    : allMeasurements.filter((m) => m.projectId === projectId && !m.floorId);
+  const measurements = (allMs || []).filter((m) => (m.floorId === floorId || m.floor_id === floorId) && m.projectId === projectId);
 
   const [cursorPosition, setCursorPosition] = useState({ x: 0.5, y: 0.5 });
   const [isCapturing, setIsCapturing] = useState(false);
-  const [liveSignal, setLiveSignal] = useState<any>(null);
-  const [liveLocation, setLiveLocation] = useState<any>(null);
-  const timeoutRef = useRef<number | null>(null);
+  const [activeCarrier, setActiveCarrier] = useState<'T-Mobile' | 'Verizon' | 'AT&T'>('T-Mobile');
+  const [signalHistory, setSignalHistory] = useState<{rsrp: number[], rsrq: number[], snr: number[]}>({ rsrp: [], rsrq: [], snr: [] });
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-  const isWifi = liveSignal?.networkType === "wifi" || (navigator as any).connection?.type === "wifi";
-
+  // 1. HYBRID DRIVE: Wake up Modem Bridge + High-Intensity Heartbeat
   useEffect(() => {
-    const wakeUpGps = navigator.geolocation.watchPosition(() => {}, () => {}, { enableHighAccuracy: true });
     requestLocationPermissions();
-    const sigId = watchCellularSignal((s) => setLiveSignal(s), 1000);
-    const locId = watchLocation((l) => setLiveLocation(l));
+    const stopMonitoring = startSignalMonitoring();
+    
+    // 1.5s Heartbeat to ensure UI is snappy even if the listener is quiet
+    const heartbeat = setInterval(async () => {
+      const liveData = await getCellularSignal();
+      if (liveData && liveData.carrier !== 'ERROR') {
+        useStore.setState({ 
+          currentSignal: {
+            ...liveData,
+            sinr: (liveData as any).sinr ?? -10,
+            technology: (liveData as any).technology ?? 'LTE'
+          }
+        });
+      }
+    }, 1500);
+
     return () => {
-      navigator.geolocation.clearWatch(wakeUpGps);
-      clearSignalWatch(sigId);
-      if (locId) clearLocationWatch(locId);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      stopMonitoring();
+      clearInterval(heartbeat);
     };
   }, []);
 
+  // 2. HISTORY TRACKING: Sync sparklines with store
+  useEffect(() => {
+    if (currentSignal) {
+      setSignalHistory(prev => ({
+        rsrp: [...(prev.rsrp || []), Number(currentSignal.rsrp) || -140].slice(-30),
+        rsrq: [...(prev.rsrq || []), Number(currentSignal.rsrq) || -20].slice(-30),
+        snr: [...(prev.snr || []), Number(currentSignal.sinr) || -10].slice(-30),
+      }));
+    }
+  }, [currentSignal]);
+
+  if (!project || !floor) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-10 text-center">
+        <AlertTriangle size={64} className="text-red-500 mb-4 animate-pulse" />
+        <h2 className="text-xl font-black text-white uppercase mb-2">Data Link Severed</h2>
+        <button onClick={onBack} className="w-full py-4 bg-[#27AAE1] text-black font-black rounded-2xl uppercase">Return to Mission Control</button>
+      </div>
+    );
+  }
+
   const handleCaptureSample = async () => {
-    // Only allow capture if floorplan exists
-    if (!mapImage) return;
-    
+    if (!mapImage || !currentSignal) return;
     setIsCapturing(true);
-    const signalData = liveSignal || await getCellularSignal();
-    const location = liveLocation || await getCurrentLocation().catch(() => null);
 
-    const measurement: Measurement = {
-      id: generateUUID(),
-      projectId,
-      floorId: floorId || '',
-      x: cursorPosition.x,
-      y: cursorPosition.y,
-      locationNumber: measurements.length + 1,
-      rsrp: signalData.rsrp || 0,
-      rsrq: signalData.rsrq || 0,
-      sinr: signalData.sinr || 0,
-      rssi: signalData.rssi || 0,
-      latitude: location?.latitude,
-      longitude: location?.longitude,
-      techType: signalData.networkType || 'LTE',
-      cellId: signalData.cellId || 'N/A',
-      carrierName: signalData.carrierName || 'N/A',
-      band: signalData.band,
-      timestamp: Date.now(),
-    };
+    try {
+      const measurement: Measurement = {
+        id: generateUUID(),
+        projectId,
+        floorId: floorId || '',
+        x: Math.max(0.01, Math.min(0.99, cursorPosition.x)),
+        y: Math.max(0.01, Math.min(0.99, cursorPosition.y)),
+        locationNumber: measurements.length + 1,
+        rsrp: Number(currentSignal.rsrp) || -140,
+        rsrq: Number(currentSignal.rsrq) || -20,
+        sinr: Number(currentSignal.sinr) || -10,
+        carrierName: currentSignal.carrier || activeCarrier,
+        timestamp: Date.now(),
+      };
 
-    addMeasurement(measurement);
+      console.log('[SurveyMode] Capturing Real Hardware Data:', measurement);
+      addMeasurement(measurement);
+
+    } catch (e) {
+      console.error('[SurveyMode] Capture failed:', e);
+    }
+
     setTimeout(() => setIsCapturing(false), 300);
   };
 
-  if (!project) return null;
-
   return (
-    <div className="fixed inset-0 bg-[#0F172A] flex flex-col overflow-hidden text-white font-sans">
-      {/* COMPACT HEADER */}
-      <div className="shrink-0 bg-slate-900 border-b border-white/10 pt-12 pb-3 px-4 z-30">
+    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden text-white z-[1000]">
+      {/* HEADER */}
+      <div className="shrink-0 bg-slate-900/95 border-b border-white/5 pt-12 pb-3 px-4 z-30 shadow-2xl">
         <div className="flex items-center justify-between mb-2">
-          <button onClick={onBack} className="p-1 -ml-1 text-slate-400 active:text-[#27AAE1]">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-black bg-[#27AAE1]/10 text-[#27AAE1] px-2.5 py-0.5 rounded-full border border-[#27AAE1]/20">
-              {measurements.length} SAMPLES
+          <button onClick={onBack} className="p-2 text-[#27AAE1] active:opacity-50"><ArrowLeft size={24} /></button>
+          
+          <div className="flex items-center gap-2 px-3 py-1 bg-black/40 rounded-full border border-white/10">
+            <div className={`w-1.5 h-1.5 rounded-full ${currentSignal ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+              {currentSignal ? 'Link Active' : 'Waiting for Modem'}
             </span>
           </div>
+
+          <button onClick={() => measurements.length > 0 && deleteMeasurement(measurements[measurements.length-1].id)} className="p-2 text-red-500 active:scale-90"><Trash2 size={20} /></button>
         </div>
 
-        {isWifi && (
-          <div className="bg-orange-500/10 border border-orange-500/20 rounded-md p-1.5 mb-2 flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
-            <span className="text-orange-200 text-[9px] font-bold uppercase tracking-tighter">Disable Wi-Fi for RF Accuracy</span>
-          </div>
-        )}
-
-        {/* COMPACT RF DASHBOARD */}
-        <div className="bg-slate-800/40 rounded-lg border border-white/10 p-2.5 shadow-sm">
-          <div className="grid grid-cols-12 gap-2 items-center">
-            {/* Cell Info (5 columns) */}
-            <div className="col-span-5 border-r border-white/5 pr-2">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Wifi className="w-3.5 h-3.5 text-[#27AAE1]" />
-                <span className="text-[13px] font-black italic tracking-tight">{getCarrierLogo(liveSignal?.carrier || "SEARCH")} {liveSignal?.networkType || ""}</span>
-                <span className="text-[10px] bg-[#27AAE1] px-1.5 py-0.5 rounded text-white font-bold">{liveSignal?.band || "---"}</span>
-              </div>
-              <div className="space-y-1 text-[11px] font-mono text-slate-300">
-                <div>RSRP: <span className="text-white font-bold">{liveSignal?.rsrp || "--"}</span></div>
-                <div>RSRQ: <span className="text-white font-bold">{liveSignal?.rsrq || "--"}</span></div>
-                <div>RSSI: <span className="text-white font-bold">{liveSignal?.rssi || "--"}</span></div>
-                <div>SINR: <span className="text-white font-bold">{liveSignal?.sinr || "--"}</span></div>
-                <div className="text-[10px]">CID: <span className="text-[#27AAE1] font-bold">{liveSignal?.cellId || "--"}</span></div>
-              </div>
+        <div className="bg-black/60 rounded-xl border border-[#27AAE1]/20 p-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col items-center">
+              <span className="text-[8px] text-slate-500 font-bold uppercase">RSRP</span>
+              <span className="text-sm font-black">{currentSignal?.rsrp ?? "--"}</span>
+              <RFSparkline data={signalHistory.rsrp} color="#27AAE1" min={-140} max={-44} />
             </div>
-
-            {/* GPS Info (7 columns) */}
-            <div className="col-span-7 pl-2 flex flex-col justify-center">
-              <div className="flex items-center gap-1.5 text-green-500 mb-1">
-                <MapPin className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-black uppercase tracking-widest">GPS LOCK</span>
-              </div>
-              <div className="text-[11px] font-mono font-medium text-slate-300 flex justify-between gap-2">
-                <span>LAT: {liveSignal?.latitude ? liveSignal.latitude.toFixed(5) : "0.00000"}</span>
-                <span>LNG: {liveSignal?.longitude ? liveSignal.longitude.toFixed(5) : "0.00000"}</span>
-              </div>
-              <div className="text-[9px] text-slate-500 mt-0.5 uppercase tracking-tighter flex justify-between">
-                <span>Acc: ±{liveSignal?.accuracy?.toFixed(1) || "0"}m</span>
-                <span>Alt: {liveSignal?.altitude?.toFixed(1) || "0"}m</span>
-              </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[8px] text-slate-500 font-bold uppercase">SNR</span>
+              <span className="text-sm font-black">{currentSignal?.sinr ?? "--"}</span>
+              <RFSparkline data={signalHistory.snr} color="#27AAE1" min={-10} max={30} />
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[8px] text-slate-500 font-bold uppercase">RSRQ</span>
+              <span className="text-sm font-black">{currentSignal?.rsrq ?? "--"}</span>
+              <RFSparkline data={signalHistory.rsrq} color="#27AAE1" min={-20} max={-3} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* MAXIMIZED MAP AREA WITH GLOW */}
-      <div className="flex-1 relative z-10 bg-slate-950 overflow-hidden p-2">
-        <div className="w-full h-full rounded-xl border-2 border-[#27AAE1]/30 shadow-2xl shadow-[#27AAE1]/20 overflow-hidden">
-          <ZoomableFloorPlan
-            floorPlanImage={mapImage}
-            allowClick={!!mapImage}
-            onCanvasClick={(x,y) => { 
-              // Only allow crosshair placement if floorplan exists
-              if (!mapImage) return;
-              // Constrain crosshair to map boundaries
-              const clampedX = Math.max(0.01, Math.min(0.99, x));
-              const clampedY = Math.max(0.01, Math.min(0.99, y));
-              setCursorPosition({x: clampedX, y: clampedY}); 
-            }}
-          >
-            {measurements.map((m, index) => {
-              const quality = getSignalQuality(m, settings.thresholds);
-              return (
-                <div
-                  key={m.id}
-                  className={`absolute w-2 h-2 rounded-full border border-white shadow-sm ${quality.bgColor}`}
-                  style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, transform: 'translate(-50%, -50%)' }}
-                />
-              );
-            })}
-            {/* Only show crosshair if floorplan exists */}
-            {mapImage && (
-              <div className="absolute" style={{ left: `${cursorPosition.x * 100}%`, top: `${cursorPosition.y * 100}%`, transform: 'translate(-50%, -50%)' }}>
-                <Crosshair className="w-8 h-8 text-yellow-400 drop-shadow-lg opacity-90" />
-              </div>
-            )}
-          </ZoomableFloorPlan>
-        </div>
-      </div>
-
-      {/* SLIM ACTION FOOTER */}
-      <div className="shrink-0 p-3 bg-slate-900 border-t border-white/5 pb-6">
-        <button
-          onClick={handleCaptureSample}
-          disabled={isCapturing || !mapImage}
-          className={`w-full py-3.5 ${!mapImage ? 'bg-slate-700 cursor-not-allowed' : 'bg-[#27AAE1] active:bg-[#1C82AD]'} text-white rounded-xl font-black text-base shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]`}
+      {/* VIEWPORT */}
+      <div className="flex-1 relative bg-black">
+        <ZoomableFloorPlan
+          floorPlanImage={mapImage}
+          allowClick={true}
+          onCanvasClick={(x,y) => setCursorPosition({x, y})}
+          onLoad={() => setIsMapLoaded(true)}
         >
-          <RadioIcon className="w-5 h-5" />
-          {!mapImage ? 'UPLOAD FLOORPLAN FIRST' : isCapturing ? 'LOGGING...' : 'CAPTURE SAMPLE'}
+           {isMapLoaded && measurements.map((m, index) => {
+            try {
+              const quality = getSignalQuality(m, settings?.thresholds || { rsrp: { good: -90, fair: -110 }, sinr: { good: 10, fair: 0 } });
+              return (
+                <div key={m.id} className="absolute" style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, transform: 'translate(-50%, -50%)' }}>
+                   <div className={`w-4 h-4 rounded-full border border-white/50 shadow-lg flex items-center justify-center text-[7px] font-black text-black ${quality.bgColor}`}>
+                      {index + 1}
+                   </div>
+                </div>
+              );
+            } catch (e) { return null; }
+          })}
+
+          <div className="absolute" style={{ left: `${cursorPosition.x * 100}%`, top: `${cursorPosition.y * 100}%`, transform: 'translate(-50%, -50%)' }}>
+             <Crosshair className="w-5 h-5 text-[#27AAE1] drop-shadow-[0_0_8px_#27AAE1]" strokeWidth={2} />
+          </div>
+        </ZoomableFloorPlan>
+
+        <div className="absolute top-6 left-6 p-3 bg-black/80 backdrop-blur-md rounded-2xl border border-[#27AAE1]/30 shadow-2xl z-40">
+           <div className="flex items-center gap-2">
+             <Database size={14} className="text-[#27AAE1]" />
+             <span className="text-xs font-black text-white">{measurements.length} <span className="text-[#27AAE1] opacity-60 uppercase font-bold text-[9px]">Captures</span></span>
+           </div>
+        </div>
+      </div>
+
+      {/* CAPTURE BUTTON AREA */}
+      <div className="shrink-0 p-4 bg-slate-900 border-t border-white/5 pb-12">
+        <div className="mb-3 p-4 bg-yellow-500/10 border border-yellow-500/40 rounded-2xl">
+          <div className="flex items-center justify-between mb-1">
+             <span className="text-[9px] font-black text-yellow-500 uppercase tracking-tighter">Hardware Telemetry Stream</span>
+             <Activity size={10} className="text-yellow-500 animate-pulse" />
+          </div>
+          <div className="flex justify-between items-end">
+             <p className="text-xs font-mono text-white">
+                RSRP: <span className="text-yellow-400 font-bold">{currentSignal?.rsrp ?? 'NULL'}</span> | 
+                SINR: <span className="text-yellow-400 font-bold">{currentSignal?.sinr ?? 'NULL'}</span>
+             </p>
+             <p className="text-[8px] font-mono text-slate-500">{currentSignal?.carrier || 'SCANNING'}</p>
+          </div>
+        </div>
+
+        <button 
+          onClick={handleCaptureSample} 
+          disabled={isCapturing || !mapImage || !currentSignal} 
+          className="w-full py-5 bg-[#27AAE1] text-black rounded-2xl font-black text-lg active:scale-95 transition-all shadow-[0_10px_30px_rgba(39,170,225,0.3)] disabled:opacity-50 disabled:grayscale"
+        >
+          {isCapturing ? 'ACQUIRING DATA...' : 'CAPTURE SITE SAMPLE'}
         </button>
       </div>
     </div>

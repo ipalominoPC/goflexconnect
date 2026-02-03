@@ -1,0 +1,138 @@
+﻿import React, { useEffect, useState } from 'react';
+import { ArrowLeft, Radio, Database, Cpu, ShieldCheck, Zap, Activity } from 'lucide-react';
+import { useStore } from '../store/useStore';
+import { Capacitor } from '@capacitor/core';
+
+// Define the Hardware Interface for the S24 Bridge
+interface GFCModemPlugin {
+  getSignal(): Promise<{
+    carrierName: string;
+    networkType: string;
+    rsrp: number;
+    rsrq: number;
+    sinr: number;
+    cellId: string;
+    band: string;
+  }>;
+}
+
+// Register the Plugin
+const GFCModem = Capacitor.registerPlugin<GFCModemPlugin>('GFCModem');
+
+interface DiagnosticsProps {
+  onBack: () => void;
+}
+
+export default function Diagnostics({ onBack }: DiagnosticsProps) {
+  const { measurements = [], settings } = useStore();
+  const [liveSignal, setLiveSignal] = useState<any>(null);
+  const [uptime, setUptime] = useState(0);
+  const [bridgeStatus, setBridgeStatus] = useState('INITIALIZING');
+
+  useEffect(() => {
+    // 1. System Uptime
+    const timer = setInterval(() => setUptime(prev => prev + 1), 1000);
+
+    // 2. Claude's Robust Fetch Logic
+    const fetchSignal = async () => {
+      try {
+        const result = await GFCModem.getSignal();
+        if (result) {
+          setLiveSignal(result);
+          setBridgeStatus('ACTIVE');
+        } else {
+          setBridgeStatus('EMPTY_DATA');
+        }
+      } catch (err: any) {
+        console.error('S24 Hardware Link Error:', err);
+        setBridgeStatus('LINK_ERROR');
+      }
+    };
+
+    fetchSignal(); // Initial scan
+    const polling = setInterval(fetchSignal, 2000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(polling);
+    };
+  }, []);
+
+  // DATA MAPPING
+  const carrier = liveSignal?.carrierName || (bridgeStatus === 'ACTIVE' ? 'NO SIGNAL' : 'SCANNING...');
+  const rsrp = liveSignal?.rsrp ?? '--';
+  const tech = liveSignal?.networkType || 'MODEM ACTIVE';
+
+  const formatUptime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  return (
+    <div className="min-h-screen bg-black text-white p-6 pt-12 font-inter relative overflow-hidden">
+      {/* HEADER */}
+      <button onClick={onBack} className="text-slate-400 mb-6 uppercase text-[10px] font-black tracking-widest flex items-center gap-2 relative z-10">
+        <ArrowLeft className="w-4 h-4" /> Exit
+      </button>
+
+      <div className="flex items-center justify-between mb-8 relative z-10">
+        <div>
+          <h1 className="text-2xl font-black tracking-tighter italic uppercase text-white">System HUD</h1>
+          <p className={`text-[9px] font-black uppercase tracking-[0.3em] ${bridgeStatus === 'ACTIVE' ? 'text-[#27AAE1]' : 'text-orange-500'}`}>
+            Bridge: {bridgeStatus}
+          </p>
+        </div>
+
+        {/* PRESERVED: 6-LEG BUG BOX */}
+        <div className="relative w-16 h-16 bg-slate-900/50 rounded-2xl border border-[#27AAE1]/30 flex items-center justify-center overflow-hidden">
+          <svg width="40" height="40" viewBox="0 0 100 100" className="relative z-10 drop-shadow-[0_0_10px_#27AAE1]">
+            <style>{`
+              @keyframes scuttle { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }
+              .leg { stroke: #27AAE1; stroke-width: 5; stroke-linecap: round; fill: none; animation: scuttle 0.2s infinite ease-in-out; transform-origin: 50px 50px; }
+              .leg-mid { animation-delay: 0.05s; } .leg-bot { animation-delay: 0.1s; }
+            `}</style>
+            <path className="leg" d="M35 40 L15 30" /><path className="leg leg-mid" d="M32 50 L10 50" /><path className="leg leg-bot" d="M35 60 L15 75" />
+            <path className="leg" d="M65 40 L85 30" /><path className="leg leg-mid" d="M68 50 L90 50" /><path className="leg leg-bot" d="M65 60 L85 75" />
+            <path d="M50 30 C40 30 35 45 35 55 C35 65 42 75 50 75 C58 75 65 65 65 55 C65 45 60 30 50 30" fill="#27AAE1" />
+            <circle cx="50" cy="38" r="7" fill="#27AAE1" />
+          </svg>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-6 relative z-10">
+        <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4">
+          <Radio className="w-3 h-3 text-[#27AAE1] mb-2" />
+          <p className="text-lg font-black text-white truncate">{carrier}</p>
+          <p className="text-[9px] font-mono text-[#27AAE1] uppercase">{tech}</p>
+        </div>
+
+        <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4">
+          <Zap className="w-3 h-3 text-yellow-500 mb-2" />
+          <p className="text-lg font-black text-white">{rsrp} <span className="text-[10px] text-slate-500">dBm</span></p>
+          <div className="w-full bg-white/5 h-1 rounded-full mt-2 overflow-hidden">
+             <div className="h-full bg-yellow-500 transition-all duration-300" style={{ width: rsrp !== '--' ? `${Math.min(100, Math.max(0, (Number(rsrp) + 140)))}%` : '0%' }}></div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4">
+          <ShieldCheck className="w-3 h-3 text-[#27AAE1] mb-2" />
+          <p className="text-lg font-black text-white">{settings.rsrpTarget} <span className="text-[10px] text-slate-500">dBm</span></p>
+        </div>
+
+        <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-4">
+          <Cpu className="w-3 h-3 text-purple-500 mb-2" />
+          <p className="text-lg font-black text-white">{formatUptime(uptime)}</p>
+        </div>
+      </div>
+
+      <div className="bg-[#27AAE1]/5 border border-[#27AAE1]/20 rounded-2xl p-4 flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-3">
+          <Database className="w-4 h-4 text-[#27AAE1]" />
+          <p className="text-xs font-bold text-white">{measurements.length} Records</p>
+        </div>
+        <Activity className="w-4 h-4 text-[#27AAE1] animate-pulse" />
+      </div>
+    </div>
+  );
+}

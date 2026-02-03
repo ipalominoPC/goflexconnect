@@ -6,6 +6,7 @@ interface ZoomableFloorPlanProps {
   floorPlanImage?: string;
   allowClick?: boolean;
   onCanvasClick?: (x: number, y: number) => void;
+  onLoad?: () => void;
 }
 
 export default function ZoomableFloorPlan({
@@ -13,12 +14,14 @@ export default function ZoomableFloorPlan({
   floorPlanImage,
   allowClick = false,
   onCanvasClick,
+  onLoad,
 }: ZoomableFloorPlanProps) {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragMoved, setDragMoved] = useState(false);
+  const [imgDims, setImgDims] = useState({ w: '100%', h: '100%' });
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -34,12 +37,8 @@ export default function ZoomableFloorPlan({
   const handleInteractionEnd = (clientX: number, clientY: number) => {
     if (!dragMoved && allowClick && onCanvasClick && imageRef.current) {
       const rect = imageRef.current.getBoundingClientRect();
-      
-      // Precision math: Map click to 0.0 - 1.0 within the visible image pixels
       const x = (clientX - rect.left) / rect.width;
       const y = (clientY - rect.top) / rect.height;
-
-      // HARD LOCK: Only trigger if the click is physically on the floor plan pixels
       if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
         onCanvasClick(x, y);
       }
@@ -74,7 +73,6 @@ export default function ZoomableFloorPlan({
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-black touch-none flex items-center justify-center" ref={containerRef}>
-      {/* Zoom Controls */}
       <div className="absolute top-4 right-4 z-50 flex flex-col gap-3">
         <button onClick={(e) => { e.stopPropagation(); setScale(s => Math.min(s + 1, 8)); }} className="w-12 h-12 bg-slate-800/90 text-white rounded-xl border border-white/20 flex items-center justify-center shadow-2xl active:bg-[#27AAE1]"><ZoomIn className="w-6 h-6" /></button>
         <button onClick={(e) => { e.stopPropagation(); setScale(s => Math.max(s - 1, 1)); }} className="w-12 h-12 bg-slate-800/90 text-white rounded-xl border border-white/20 flex items-center justify-center shadow-2xl active:bg-[#27AAE1]"><ZoomOut className="w-6 h-6" /></button>
@@ -113,16 +111,20 @@ export default function ZoomableFloorPlan({
             className="max-w-full max-h-full object-contain pointer-events-none select-none shadow-2xl"
             alt="Map"
             draggable={false}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setImgDims({ w: `${img.clientWidth}px`, h: `${img.clientHeight}px` });
+              if (onLoad) onLoad();
+            }}
           />
         ) : (
           <div className="p-20 bg-slate-900 rounded-3xl border-2 border-dashed border-white/5 text-slate-700 font-black uppercase text-xs">No Floor Plan</div>
         )}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            {/* This ensures dots and crosshairs stay relative to the image size */}
-            <div style={{ 
-                width: imageRef.current?.clientWidth || '100%', 
-                height: imageRef.current?.clientHeight || '100%',
-                position: 'relative' 
+            <div style={{
+                width: imgDims.w,
+                height: imgDims.h,
+                position: 'relative'
             }}>
                 {children}
             </div>

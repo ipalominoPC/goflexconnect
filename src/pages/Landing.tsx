@@ -1,6 +1,6 @@
-import { Radio, MapPin, FolderKanban } from 'lucide-react';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
-import { SecondaryButton } from '../components/ui/SecondaryButton';
+import { useState, useEffect } from 'react';
+import { Radio, Grid3X3, FolderLock, Shield, Cloud, Loader2, ChevronRight, Zap } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface LandingProps {
   onGetAccess: () => void;
@@ -8,328 +8,145 @@ interface LandingProps {
 }
 
 export function Landing({ onGetAccess, onLogIn }: LandingProps) {
-  const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
-    element?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const [partnerData, setPartnerData] = useState<any>(null);
+  const [loadingPartner, setLoadingPartner] = useState(true);
+
+  useEffect(() => {
+    async function fetchPartner() {
+      try {
+        const { data } = await supabase
+          .from('strategic_partners')
+          .select('*')
+          .eq('is_active', true)
+          .single();
+        if (data) setPartnerData(data);
+      } catch (e) {
+        console.log("Defaulting to incognito gateway");
+      } finally {
+        setLoadingPartner(false);
+      }
+    }
+    fetchPartner();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-goflex-bg">
-      <nav className="sticky top-0 z-50 bg-goflex-bg/95 backdrop-blur-sm border-b border-gray-800 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <img
-                src="/icons/logo-96.png"
-                alt="GoFlexConnect logo"
-                className="h-8 w-8 rounded-lg shadow-[0_0_10px_rgba(39,170,225,0.8)] border border-[#27AAE1]/30"
-              />
-              <h1 className="text-xl font-bold text-white dark:text-white" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                GoFlexConnect
-              </h1>
-            </div>
-
-            <div className="hidden md:flex items-center space-x-8">
-              <button
-                onClick={() => scrollToSection('hero')}
-                className="text-gray-300 hover:text-white transition-colors"
-              >
-                Home
-              </button>
-              <button
-                onClick={() => scrollToSection('features')}
-                className="text-gray-300 hover:text-white transition-colors"
-              >
-                Features
-              </button>
-              <button
-                onClick={() => scrollToSection('early-access')}
-                className="text-gray-300 hover:text-white transition-colors"
-              >
-                Early Access
-              </button>
-              <button
-                onClick={() => scrollToSection('contact')}
-                className="text-gray-300 hover:text-white transition-colors"
-              >
-                Contact
-              </button>
-              <PrimaryButton onClick={onGetAccess} className="py-2 px-6">
-                Get Free Access
-              </PrimaryButton>
-            </div>
-
-            <div className="md:hidden">
-              <PrimaryButton onClick={onGetAccess} className="py-2 px-4 text-sm">
-                Get Access
-              </PrimaryButton>
-            </div>
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-[#27AAE1]/30">
+      <style>{`
+        @keyframes signal-slow { 0%, 100% { opacity: 0.2; transform: scaleY(0.8); } 50% { opacity: 1; transform: scaleY(1.1); } }
+        @keyframes grid-pulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.8) blur(1px); } }
+        @keyframes vault-lock { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px #f97316); } 50% { transform: scale(1.05); filter: drop-shadow(0 0 25px #f97316); } }
+        @keyframes bridge-glow { 0%, 100% { border-color: rgba(39, 170, 225, 0.2); box-shadow: 0 0 30px rgba(39, 170, 225, 0.05); } 50% { border-color: rgba(39, 170, 225, 0.6); box-shadow: 0 0 50px rgba(39, 170, 225, 0.2); } }
+        @keyframes button-pulse { 0% { box-shadow: 0 0 0 0px rgba(39, 170, 225, 0.4); } 100% { box-shadow: 0 0 0 15px rgba(39, 170, 225, 0); } }
+      `}</style>
+      
+      <nav className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-6 h-20 pt-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img src="/icons/logo-96.png" className="h-9 w-9 rounded-xl border border-[#27AAE1]/50 shadow-[0_0_15px_#27AAE1]" />
+            <span className="text-xl font-bold tracking-tighter text-white italic">GoFlexConnect</span>
           </div>
         </div>
       </nav>
 
-      <section id="hero" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
-                Cellular Signal Survey & Analysis Tool
-              </h1>
-              <p className="text-lg text-gray-300">
-                Professional 4G and 5G signal surveying for RF engineers. Create detailed heatmaps,
-                analyze network performance, and optimize coverage with real-time data collection and visualization.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <PrimaryButton onClick={onGetAccess}>
-                  Get Free Access
-                </PrimaryButton>
-                <SecondaryButton onClick={onLogIn}>
-                  Log In
-                </SecondaryButton>
-              </div>
-            </div>
+      {/* SECTION 1: HERO - Reduced bottom padding */}
+      <section id="hero" className="pt-20 pb-6 px-6 flex flex-col items-center text-center">
+        <div className="relative mb-12">
+          <div className="absolute inset-0 bg-[#27AAE1] blur-[60px] opacity-40 rounded-full animate-pulse"></div>
+          <img src="/icons/logo-128.png" className="relative w-32 h-32 rounded-[32px] shadow-[0_0_50px_#27AAE1] border-2 border-[#27AAE1]/50" />
+        </div>
+        <h1 className="text-4xl md:text-6xl font-black tracking-tighter italic text-white mb-6">Cellular Signal Survey <br/><span className="text-[#27AAE1] drop-shadow-[0_0_15px_#27AAE1]">& Analysis Tool</span></h1>
+        <p className="max-w-2xl mx-auto text-slate-400 text-lg mb-10 font-medium leading-relaxed px-4">Surgical RF mapping and coverage heatmapping for professional field engineering.</p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center w-full max-w-md mx-auto">
+          <button onClick={onGetAccess} className="flex-1 bg-[#27AAE1] px-8 py-5 rounded-2xl text-sm font-black shadow-[0_0_25px_#27AAE1] active:scale-95 transition-all text-black uppercase tracking-widest">Register for Access</button>
+          <button onClick={onLogIn} className="flex-1 bg-slate-900 border border-white/20 px-8 py-5 rounded-2xl text-sm font-black hover:bg-slate-800 transition-all uppercase tracking-widest">Member Login</button>
+        </div>
+      </section>
 
-            <div className="relative">
-              <div className="bg-goflex-card rounded-2xl p-8 shadow-2xl border border-gray-800">
-                <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-950 rounded-lg relative overflow-hidden">
-                  <div
-                    className="absolute inset-0 opacity-60"
-                    style={{
-                      background: 'radial-gradient(circle at 30% 40%, rgba(39, 170, 225, 0.8) 0%, rgba(39, 170, 225, 0.4) 20%, rgba(1, 120, 183, 0.3) 40%, transparent 70%)',
-                    }}
-                  />
-                  <div
-                    className="absolute inset-0 opacity-40"
-                    style={{
-                      background: 'radial-gradient(circle at 70% 60%, rgba(6, 180, 215, 0.6) 0%, rgba(6, 180, 215, 0.3) 25%, transparent 50%)',
-                    }}
-                  />
-                  <div className="absolute top-4 right-4 bg-goflex-bg/80 backdrop-blur-sm px-4 py-2 rounded-lg">
-                    <div className="text-xs text-gray-400">RSRP</div>
-                    <div className="text-lg font-bold text-goflex-blue">-75 dBm</div>
+      {/* SECTION 2: THE STRATEGIC BRIDGE - Pulled Up closer to Hero */}
+      <section className="py-6 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="bg-slate-900/60 border-2 border-dashed border-[#27AAE1]/30 rounded-[2.5rem] p-8 md:p-14 text-center animate-[bridge-glow_4s_infinite]">
+            {loadingPartner ? (
+              <div className="flex items-center justify-center gap-3 py-4">
+                <Loader2 className="animate-spin text-[#27AAE1]" size={18} />
+                <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.4em]">Establishing Engineering Link...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col md:flex-row items-center justify-between gap-10">
+                <div className="text-left max-w-2xl">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="p-2 bg-[#27AAE1]/20 rounded-lg border border-[#27AAE1]/40">
+                      <Shield size={18} className="text-[#27AAE1]" />
+                    </div>
+                    <span className="text-[10px] font-black text-[#27AAE1] uppercase tracking-[0.5em]">Certified Design Division</span>
                   </div>
-                  <div className="absolute bottom-4 left-4 flex gap-2">
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  </div>
+                  <h2 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tight mb-3">
+                    {partnerData?.name || "Professional Design Support"}
+                  </h2>
+                  <p className="text-slate-400 text-base font-medium leading-relaxed">
+                    {partnerData?.description || "Create a free account to unlock hardware-direct signal analysis. Our engineering team provides complimentary system review for all captured field data."}
+                  </p>
                 </div>
+                
+                {/* UPGRADED EXECUTIVE ACTION BUTTON */}
+                <button 
+                  onClick={onGetAccess}
+                  className="relative group w-full md:w-auto bg-[#27AAE1] hover:bg-[#32c1fd] text-black px-10 py-6 rounded-2xl flex items-center justify-center gap-4 transition-all active:scale-95 animate-[button-pulse_2s_infinite]"
+                >
+                  <Zap size={20} fill="black" className="group-hover:scale-125 transition-transform" />
+                  <span className="text-sm font-black uppercase tracking-[0.2em]">Start Design Review</span>
+                  <ChevronRight size={20} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
+                </button>
               </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 3: FEATURES */}
+      <section id="features" className="py-24 bg-slate-900/40 border-y border-white/10 px-6 mt-12">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="grid md:grid-cols-3 gap-8 text-left">
+            <div className="p-8 bg-slate-950 border border-[#27AAE1]/60 rounded-[2.5rem] shadow-[0_0_40px_rgba(39,170,225,0.2)]">
+              <div className="flex items-end gap-1.5 h-10 mb-8">
+                <div className="w-1.5 h-1/3 bg-red-500 rounded-full animate-[signal-slow_2.5s_infinite_0.1s]" />
+                <div className="w-1.5 h-1/2 bg-red-500 rounded-full animate-[signal-slow_2.5s_infinite_0.4s]" />
+                <div className="w-1.5 h-2/3 bg-yellow-500 rounded-full animate-[signal-slow_2.5s_infinite_0.7s]" />
+                <div className="w-1.5 h-3/4 bg-yellow-500 rounded-full animate-[signal-slow_2.5s_infinite_1.0s]" />
+                <div className="w-1.5 h-[90%] bg-green-500 rounded-full animate-[signal-slow_2.5s_infinite_1.3s]" />
+                <div className="w-1.5 h-full bg-green-500 rounded-full animate-[signal-slow_2.5s_infinite_1.6s]" />
+              </div>
+              <h3 className="text-xl font-black mb-3 tracking-widest text-white italic">Signal Scanning</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Capture hardware-direct RSRP, RSRQ, and SINR telemetry.</p>
+            </div>
+
+            <div className="p-8 bg-slate-950 border border-green-500/60 rounded-[2.5rem] shadow-[0_0_40_rgba(34,197,94,0.2)]">
+              <div className="grid grid-cols-3 gap-1 w-fit mb-8 animate-[grid-pulse_4s_infinite]">
+                 <div className="w-4 h-4 bg-green-500 rounded-sm shadow-[0_0_8px_#22c55e]" />
+                 <div className="w-4 h-4 bg-yellow-500 rounded-sm" />
+                 <div className="w-4 h-4 bg-red-600 rounded-sm shadow-[0_0_8px_#ef4444]" />
+                 <div className="w-4 h-4 bg-yellow-500 rounded-sm" />
+                 <div className="w-4 h-4 bg-green-500 rounded-sm" />
+                 <div className="w-4 h-4 bg-green-500 rounded-sm" />
+                 <div className="w-4 h-4 bg-red-600 rounded-sm" />
+                 <div className="w-4 h-4 bg-yellow-500 rounded-sm" />
+                 <div className="w-4 h-4 bg-green-500 rounded-sm" />
+              </div>
+              <h3 className="text-xl font-black mb-3 tracking-widest text-white italic">Live Heatmaps</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Coverage visualization using Peak Signal Engine.</p>
+            </div>
+
+            <div className="p-8 bg-slate-950 border border-orange-500/60 rounded-[2.5rem] shadow-[0_0_40px_rgba(249,115,22,0.2)]">
+              <div className="mb-8 w-fit animate-[vault-lock_3s_infinite]"><FolderLock className="w-10 h-10 text-orange-500" /></div>
+              <h3 className="text-xl font-black mb-3 tracking-widest text-white italic">Project Vault</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Organize surveys with automated cloud infrastructure.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-goflex-card/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Powerful Features
-            </h2>
-            <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-              The ultimate tool for cellular surveying — get network optimization, fast.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-goflex-card rounded-xl p-8 border border-gray-800 hover:border-goflex-blue transition-colors">
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 bg-[#27AAE1]/10 border border-[#27AAE1]/20 shadow-[0_0_15px_rgba(39,170,225,0.4)]">
-                <Radio className="w-7 h-7 text-[#27AAE1] drop-shadow-[0_0_5px_rgba(39,170,225,0.8)]" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                4G & 5G Signal Scanning
-              </h3>
-              <p className="text-gray-400">
-                Capture detailed cellular metrics including RSRP, RSRQ, SINR, and RSSI.
-                Support for all major carriers and network technologies.
-              </p>
-            </div>
-
-            <div className="bg-goflex-card rounded-xl p-8 border border-gray-800 hover:border-goflex-blue transition-colors">
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 bg-[#27AAE1]/10 border border-[#27AAE1]/20 shadow-[0_0_15px_rgba(39,170,225,0.4)]">
-                <MapPin className="w-7 h-7 text-[#27AAE1] drop-shadow-[0_0_5px_rgba(39,170,225,0.8)]" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                Live Heatmap Generation
-              </h3>
-              <p className="text-gray-400">
-                Visualize coverage in real-time with color-coded heatmaps overlaid on floor plans.
-                Identify dead zones and optimize placement.
-              </p>
-            </div>
-
-            <div className="bg-goflex-card rounded-xl p-8 border border-gray-800 hover:border-goflex-blue transition-colors">
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 bg-[#27AAE1]/10 border border-[#27AAE1]/20 shadow-[0_0_15px_rgba(39,170,225,0.4)]">
-                <FolderKanban className="w-7 h-7 text-[#27AAE1] drop-shadow-[0_0_5px_rgba(39,170,225,0.8)]" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                Project-Based Management
-              </h3>
-              <p className="text-gray-400">
-                Organize surveys by project and floor. Track multiple sites, generate reports,
-                and maintain a complete history of all measurements.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="early-access" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Early Access: Join Free Today
-            </h2>
-            <p className="text-lg text-gray-400">
-              Be among the first to experience GoFlexConnect while it's in beta
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-12">
-            <div className="bg-goflex-card rounded-xl p-8 border border-gray-800">
-              <h3 className="text-2xl font-bold text-white mb-6">
-                Early Access Benefits
-              </h3>
-              <ul className="space-y-4">
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-goflex-blue/20 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-goflex-blue"></div>
-                  </div>
-                  <span className="text-gray-300">
-                    <strong className="text-white">Full access</strong> to all current features
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-goflex-blue/20 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-goflex-blue"></div>
-                  </div>
-                  <span className="text-gray-300">
-                    <strong className="text-white">No credit card</strong> required during beta
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-goflex-blue/20 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-goflex-blue"></div>
-                  </div>
-                  <span className="text-gray-300">
-                    <strong className="text-white">Help shape</strong> the product roadmap
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-goflex-blue/20 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-goflex-blue"></div>
-                  </div>
-                  <span className="text-gray-300">
-                    <strong className="text-white">Priority support</strong> from our team
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-goflex-blue/20 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-goflex-blue"></div>
-                  </div>
-                  <span className="text-gray-300">
-                    <strong className="text-white">Grandfathered pricing</strong> when we launch premium
-                  </span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="bg-goflex-card rounded-xl p-8 border border-gray-800">
-              <h3 className="text-2xl font-bold text-white mb-6">
-                Coming in Premium
-              </h3>
-              <ul className="space-y-4">
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                  </div>
-                  <span className="text-gray-400">
-                    Advanced analytics and AI-powered insights
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                  </div>
-                  <span className="text-gray-400">
-                    Team collaboration and project sharing
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                  </div>
-                  <span className="text-gray-400">
-                    Custom branded reports and white-labeling
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                  </div>
-                  <span className="text-gray-400">
-                    API access for third-party integrations
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                  </div>
-                  <span className="text-gray-400">
-                    Enterprise support and SLA guarantees
-                  </span>
-                </li>
-              </ul>
-              <div className="mt-6 pt-6 border-t border-gray-800">
-                <p className="text-sm text-gray-500 italic">
-                  Premium features coming Q2 2026
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="contact" className="py-20 px-4 sm:px-6 lg:px-8 bg-goflex-card/30">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Start using GoFlexConnect free
-          </h2>
-          <p className="text-lg text-gray-400 mb-8">
-            No credit card needed. Premium features coming soon.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <PrimaryButton onClick={onGetAccess}>
-              Get Free Access
-            </PrimaryButton>
-            <SecondaryButton onClick={onLogIn}>
-              Log In
-            </SecondaryButton>
-          </div>
-        </div>
-      </section>
-
-      <footer className="py-8 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <span className="text-sm text-gray-500">
-                © 2025 GoFlexConnect. All rights reserved.
-              </span>
-            </div>
-            <div className="flex space-x-6">
-              <button className="text-sm text-gray-400 hover:text-white transition-colors">
-                Privacy Policy
-              </button>
-              <button className="text-sm text-gray-400 hover:text-white transition-colors">
-                Terms of Service
-              </button>
-              <button className="text-sm text-gray-400 hover:text-white transition-colors">
-                Contact
-              </button>
-            </div>
-          </div>
-        </div>
+      <footer className="py-12 border-t border-white/5 text-center px-6">
+        <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.5em]">© 2026 GoFlexConnect • Mission Driven Data</p>
       </footer>
     </div>
   );

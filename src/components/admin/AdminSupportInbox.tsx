@@ -1,24 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Search, MessageSquare, RefreshCw, Send, CheckCircle2, Sparkles } from 'lucide-react';
-import {
-  adminFetchSupportTickets,
-  AdminSupportTicket,
-  SupportCategory,
-  SupportStatus,
-  getCategoryLabel,
-  getStatusInfo,
-} from '../../services/supportService';
-import TicketThreadView from './TicketThreadView';
+import { Search, MessageSquare, RefreshCw, Zap, Clock, User, ChevronRight, AlertCircle, ExternalLink, Send, CheckCircle2, Loader2, CheckSquare, X, ShieldAlert } from 'lucide-react';
+import { getAllTickets, updateTicketStatus, addAdminReply, AdminTicketListItem } from '../../services/adminSupportService';
 
-export default function AdminSupportInbox() {
-  const [tickets, setTickets] = useState<AdminSupportTicket[]>([]);
-  const [filteredTickets, setFilteredTickets] = useState<AdminSupportTicket[]>([]);
+export default function AdminSupportInbox({ onViewProject }: { onViewProject?: (id: string) => void }) {
+  const [tickets, setTickets] = useState<AdminTicketListItem[]>([]);
+  const [filteredTickets, setFilteredTickets] = useState<AdminTicketListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  
+  // REPLY ENGINE STATE
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState<string>('');
+  const [submittingReply, setSubmittingReply] = useState(false);
+
+  // CUSTOM RESOLVE MODAL STATE
+  const [confirmResolve, setConfirmResolve] = useState<string | null>(null);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<SupportStatus | 'all'>('all');
-  const [categoryFilter, setCategoryFilter] = useState<SupportCategory | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -26,315 +24,230 @@ export default function AdminSupportInbox() {
   }, []);
 
   useEffect(() => {
-    applyFilters();
-  }, [tickets, statusFilter, categoryFilter, searchQuery]);
+    let filtered = [...tickets];
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((t) => t.status === statusFilter);
+    }
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.user_email?.toLowerCase().includes(query) ||
+          t.message?.toLowerCase().includes(query) ||
+          t.ticket_number?.toLowerCase().includes(query) ||
+          t.subject?.toLowerCase().includes(query)
+      );
+    }
+    setFilteredTickets(filtered);
+  }, [tickets, statusFilter, searchQuery]);
 
   const loadTickets = async () => {
     try {
       setLoading(true);
-      const data = await adminFetchSupportTickets();
-      const sortedData = data.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setTickets(sortedData);
+      const data = await getAllTickets();
+      setTickets(data);
     } catch (error) {
-      console.error('Error loading tickets:', error);
+      console.error('[AdminSupport] Load failed:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...tickets];
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((t) => t.status === statusFilter);
+  const handleSendReply = async (ticketId: string) => {
+    if (!replyText.trim()) return;
+    setSubmittingReply(true);
+    try {
+      const { success } = await addAdminReply(ticketId, replyText);
+      if (success) {
+        setReplyText('');
+        setReplyingTo(null);
+        await loadTickets();
+      }
+    } catch (e) {
+      console.error('[Truth] Reply Failed', e);
+    } finally {
+      setSubmittingReply(false);
     }
+  };
 
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter((t) => t.category === categoryFilter);
+  const executeResolve = async () => {
+    if (!confirmResolve) return;
+    try {
+      await updateTicketStatus(confirmResolve, 'resolved');
+      setConfirmResolve(null);
+      await loadTickets();
+    } catch (e) {
+      console.error('[Truth] Resolve Failed', e);
     }
+  };
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (t) =>
-          t.email.toLowerCase().includes(query) ||
-          t.name.toLowerCase().includes(query) ||
-          t.subject?.toLowerCase().includes(query) ||
-          t.message.toLowerCase().includes(query) ||
-          t.ticketNumber?.toLowerCase().includes(query)
-      );
+  const getPriorityStyle = (priority: string | null) => {
+    const p = priority?.toUpperCase();
+    if (p === 'REMEDIATION' || p === 'CRITICAL' || p === 'ZAP') {
+        return 'border-red-600 text-red-500 bg-red-600/10 animate-[burning_1.5s_infinite] shadow-[0_0_15px_rgba(220,38,38,0.4)]';
     }
-
-    setFilteredTickets(filtered);
+    if (p === 'TECHNICAL' || p === 'HIGH') return 'border-[#27AAE1] text-[#27AAE1] bg-[#27AAE1]/5';
+    return 'border-slate-500 text-slate-500 bg-slate-500/5';
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const truncateMessage = (msg: string, length: number = 80) => {
-    if (msg.length <= length) return msg;
-    return msg.slice(0, length) + '...';
-  };
-
-  const statusCounts = {
-    all: tickets.length,
-    open: tickets.filter((t) => t.status === 'open').length,
-    in_progress: tickets.filter((t) => t.status === 'in_progress').length,
-    resolved: tickets.filter((t) => t.status === 'resolved').length,
-    closed: tickets.filter((t) => t.status === 'closed').length,
-  };
-
-  const unreadCount = tickets.filter(t => t.unreadByAdmin).length;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#27AAE1]"></div>
-      </div>
-    );
-  }
-
-  if (selectedTicketId) {
-    return (
-      <TicketThreadView
-        ticketId={selectedTicketId}
-        onClose={() => {
-          setSelectedTicketId(null);
-          loadTickets();
-        }}
-      />
-    );
-  }
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+      <RefreshCw className="w-8 h-8 text-[#27AAE1] animate-spin mb-4" />
+      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Syncing Intelligence Logs...</p>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <MessageSquare className="w-6 h-6 text-[#27AAE1]" />
-            Support Inbox
-            {unreadCount > 0 && (
-              <span className="inline-flex items-center justify-center w-7 h-7 text-xs font-bold text-white bg-red-600 rounded-full animate-pulse">
-                {unreadCount}
-              </span>
-            )}
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 text-sm mt-1">
-            Manage user support requests and tickets
-          </p>
+    <div className="space-y-6 relative">
+      <style>{`
+        @keyframes burning { 
+          0%, 100% { border-color: rgba(220, 38, 38, 0.8); box-shadow: 0 0 5px rgba(220, 38, 38, 0.4); } 
+          50% { border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); transform: scale(1.05); } 
+        }
+      `}</style>
+
+      {/* FILTER BAR */}
+      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex gap-1.5">
+          {['all', 'new', 'in-review', 'resolved'].map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shrink-0 ${
+                statusFilter === s 
+                ? 'bg-[#27AAE1] text-black shadow-[0_0_10px_#27AAE1]' 
+                : 'bg-white/5 text-slate-500 border border-white/5'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
-        <button
-          onClick={loadTickets}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
       </div>
 
-      {/* Status Filters */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === 'all'
-              ? 'bg-[#27AAE1] text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          All ({statusCounts.all})
-        </button>
-        <button
-          onClick={() => setStatusFilter('open')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === 'open'
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          Open ({statusCounts.open})
-        </button>
-        <button
-          onClick={() => setStatusFilter('in_progress')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === 'in_progress'
-              ? 'bg-yellow-600 text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          In Progress ({statusCounts.in_progress})
-        </button>
-        <button
-          onClick={() => setStatusFilter('resolved')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === 'resolved'
-              ? 'bg-green-600 text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          Resolved ({statusCounts.resolved})
-        </button>
-      </div>
-
-      {/* Category & Search */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Category
-          </label>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as SupportCategory | 'all')}
-            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-[#27AAE1]/40"
+      {/* MISSION LOG CARDS */}
+      <div className="grid grid-cols-1 gap-4">
+        {filteredTickets.map((ticket) => (
+          <div 
+            key={ticket.id} 
+            className={`group bg-black/40 border border-white/5 rounded-[1.5rem] p-5 transition-all hover:bg-white/[0.02] ${
+              ticket.status === 'resolved' ? 'opacity-30 grayscale' : ''
+            }`}
           >
-            <option value="all">All Categories</option>
-            <option value="technical">Technical Support</option>
-            <option value="account">Account Support</option>
-            <option value="billing">Billing</option>
-            <option value="feature_request">Feature Request</option>
-            <option value="feedback">Feedback</option>
-          </select>
-        </div>
+            {/* CARD HEADER */}
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`px-2 py-0.5 rounded border text-[8px] font-black uppercase tracking-tighter transition-all ${getPriorityStyle(ticket.priority)}`}>
+                  {ticket.priority || 'General'}
+                </div>
+                <span className="font-mono text-[9px] text-slate-600">
+                  {ticket.ticket_number || `#${ticket.id.slice(0, 5)}`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {ticket.status !== 'resolved' && (
+                  <button onClick={() => setConfirmResolve(ticket.id)} className="p-1.5 text-slate-600 hover:text-green-500 transition-colors" title="Resolve">
+                    <CheckSquare size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Search
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by ticket #, email, name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40"
-            />
-          </div>
-        </div>
-      </div>
+            <div className="mb-4">
+              <h3 className="text-white font-bold text-xs mb-1.5 uppercase tracking-tight">{ticket.subject}</h3>
+              <div className="bg-black/40 rounded-xl p-3 border border-white/5">
+                <p className="text-slate-400 text-[11px] leading-relaxed italic truncate-2-lines">
+                  "{ticket.message || 'No telemetry message.'}"
+                </p>
+              </div>
+            </div>
 
-      {/* Tickets Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-        {filteredTickets.length === 0 ? (
-          <div className="text-center py-12">
-            <MessageSquare className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-500 dark:text-slate-400">No tickets found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Ticket #
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Message
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {filteredTickets.map((ticket) => {
-                  const statusInfo = getStatusInfo(ticket.status);
-                  const categoryLabel = getCategoryLabel(ticket.category);
-                  const isUnread = ticket.unreadByAdmin;
+            {ticket.admin_reply && (
+              <div className="mb-4 ml-4 pl-4 border-l-2 border-[#27AAE1]/30">
+                <p className="text-[8px] font-black text-[#27AAE1] uppercase tracking-widest mb-1 flex items-center gap-1">
+                  <CheckCircle2 size={10} /> HQ Instruction
+                </p>
+                <p className="text-white text-[11px] font-medium leading-relaxed bg-[#27AAE1]/5 p-2 rounded-lg">
+                  {ticket.admin_reply}
+                </p>
+              </div>
+            )}
 
-                  return (
-                    <tr
-                      key={ticket.id}
-                      onClick={() => setSelectedTicketId(ticket.id)}
-                      className={`hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer transition-colors ${
-                        isUnread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                      }`}
+            <div className="flex flex-col gap-4 pt-4 border-t border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 border border-white/5 shadow-inner">
+                    <User size={12} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-white truncate max-w-[120px]">
+                      {ticket.user_email?.split('@')[0] || 'Tech'}
+                    </p>
+                    <p className="text-[8px] text-slate-600 lowercase">{new Date(ticket.created_at).toLocaleDateString()}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {ticket.project_id && ticket.project_id !== '00000000-0000-0000-0000-000000000000' && (
+                    <button 
+                      onClick={() => onViewProject && onViewProject(ticket.project_id!)}
+                      className="px-3 py-1.5 bg-[#27AAE1]/10 border border-[#27AAE1]/30 rounded-lg text-[#27AAE1] text-[9px] font-black uppercase tracking-widest hover:bg-[#27AAE1]/20 transition-all flex items-center gap-2"
                     >
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          {isUnread && (
-                            <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
-                          )}
-                          <span
-                            className={`font-mono text-sm text-[#27AAE1] hover:underline ${
-                              isUnread ? 'font-bold' : ''
-                            }`}
-                          >
-                            {ticket.ticketNumber || `#${ticket.id.slice(0, 8)}`}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className={isUnread ? 'font-bold' : ''}>
-                          <div className="text-sm text-slate-900 dark:text-white">
-                            {ticket.name}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
-                            {ticket.email}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                          {categoryLabel}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
-                            statusInfo.color === 'blue'
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                              : statusInfo.color === 'yellow'
-                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                              : statusInfo.color === 'green'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300'
-                          }`}
-                        >
-                          {statusInfo.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 max-w-md">
-                        <p className={`text-sm text-slate-600 dark:text-slate-400 truncate ${isUnread ? 'font-semibold' : ''}`}>
-                          {truncateMessage(ticket.message, 80)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                        {formatDate(ticket.createdAt)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      <ExternalLink size={10} /> Spectate
+                    </button>
+                  )}
+                  {ticket.status !== 'resolved' && (
+                    <button 
+                      onClick={() => setReplyingTo(replyingTo === ticket.id ? null : ticket.id)}
+                      className={`p-2 rounded-lg transition-all ${replyingTo === ticket.id ? 'bg-[#27AAE1] text-black shadow-lg' : 'bg-white/5 text-slate-500 hover:text-white'}`}
+                    >
+                      <MessageSquare size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {replyingTo === ticket.id && (
+                <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Enter deployment instructions..."
+                    className="w-full h-20 bg-black border border-[#27AAE1]/30 rounded-xl p-3 text-[11px] text-white placeholder:text-slate-800 outline-none focus:border-[#27AAE1] shadow-inner"
+                  />
+                  <div className="flex justify-end">
+                    <button 
+                      disabled={submittingReply || !replyText.trim()}
+                      onClick={() => handleSendReply(ticket.id)}
+                      className="px-4 py-2 bg-[#27AAE1] text-black rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all shadow-xl"
+                    >
+                      {submittingReply ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                      Deploy Response
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        )}
+        ))}
       </div>
+
+      {/* CUSTOM ACTION MODAL: RESOLVE (SPACEX STYLE) */}
+      {confirmResolve && (
+        <div className="fixed inset-0 z-[10005] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="relative w-full max-w-sm bg-slate-900 border-2 border-green-600/40 rounded-[2.5rem] p-8 shadow-[0_0_80px_rgba(22,163,74,0.3)] text-center animate-in zoom-in-95">
+             <div className="w-16 h-16 bg-green-500/10 border border-green-500/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                <ShieldAlert className="text-green-500" size={32} />
+             </div>
+             <h2 className="text-xl font-black italic uppercase text-white mb-2">Finalize Mission</h2>
+             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-8">Mark this remediation as resolved in the HQ database?</p>
+             <div className="flex flex-col gap-3">
+                <button onClick={executeResolve} className="w-full py-4 bg-green-600 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all">Archive & Resolve</button>
+                <button onClick={() => setConfirmResolve(null)} className="w-full py-4 text-slate-500 font-black uppercase tracking-widest text-[10px]">Abort Action</button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

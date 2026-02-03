@@ -1,66 +1,85 @@
 /**
- * Admin User Service
- *
- * Provides functions for admin operations on users and plan overrides.
- * All operations require admin authentication via Supabase RPC functions.
+ * HQ Identity Service (v4.5 Truth Edition)
+ * 
+ * Master control logic for technician fleet identity and security.
  */
 
 import { supabase } from './supabaseClient';
-import { PlanId } from '../config/planLimits';
 
-export interface AdminUserWithPlan {
+export interface FleetMember {
   id: string;
   email: string;
-  created_at: string;
-  plan_override: PlanId | null;
-  plan_override_reason: string | null;
-  plan_override_expires_at: string | null;
+  full_name: string;
+  company_name: string | null;
+  phone_number: string | null;
+  project_count: number;
+  last_active: string | null;
+  status: 'active' | 'idle';
 }
 
 /**
- * Fetch all users with their plan override data (admin only)
- * Uses SECURITY DEFINER RPC to bypass RLS safely
+ * FETCH GLOBAL IDENTITY DIRECTORY
  */
-export async function adminFetchUsersWithPlans(): Promise<AdminUserWithPlan[]> {
-  const { data, error } = await supabase.rpc('admin_get_users_with_plans');
+export async function getFleetDirectory(): Promise<FleetMember[]> {
+  try {
+    // 1. Fetch profiles with new identity fields
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, company_name, phone_number, updated_at');
 
-  if (error) {
-    console.error('Error fetching users:', error);
-    throw new Error(error.message || 'Failed to load users');
+    if (profileError) throw profileError;
+
+    // 2. Fetch mission counts
+    const { data: projects, error: projectError } = await supabase
+      .from('projects')
+      .select('user_id');
+
+    if (projectError) throw projectError;
+
+    return profiles.map(profile => {
+      const userProjects = projects.filter(p => p.user_id === profile.id);
+      const lastActiveDate = new Date(profile.updated_at);
+      const isRecentlyActive = (Date.now() - lastActiveDate.getTime()) < 86400000;
+
+      return {
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.full_name || 'Unverified Node',
+        company_name: profile.company_name,
+        phone_number: profile.phone_number,
+        project_count: userProjects.length,
+        last_active: profile.updated_at,
+        status: isRecentlyActive ? 'active' : 'idle'
+      };
+    }).sort((a, b) => b.project_count - a.project_count);
+
+  } catch (err) {
+    console.error('[Truth HQ] Identity uplink failed:', err);
+    return [];
   }
-
-  return (data || []) as AdminUserWithPlan[];
 }
 
 /**
- * Update a user's plan override (admin only)
+ * TRIGGER SECURE PASSWORD RESET (Admin Action)
+ * Sends an Azure-style reset link to the technician.
  */
-export async function adminUpdatePlanOverride(
-  userId: string,
-  override: {
-    plan_override: PlanId | null;
-    plan_override_reason: string | null;
-    plan_override_expires_at: string | null;
+export async function triggerPasswordResetHQ(email: string) {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin, // Returns user to your Vercel URL
+    });
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    console.error('[Truth HQ] Password reset trigger failed:', err);
+    return { success: false, error: err };
   }
-): Promise<void> {
+}
+
+export async function resetUserOnboarding(userId: string) {
   const { error } = await supabase
     .from('profiles')
-    .update(override)
+    .update({ has_completed_onboarding: false, updated_at: new Date().toISOString() })
     .eq('id', userId);
-
-  if (error) {
-    console.error('Error updating plan override:', error);
-    throw new Error(error.message || 'Failed to update plan override');
-  }
-}
-
-/**
- * Clear a user's plan override (admin only)
- */
-export async function adminClearPlanOverride(userId: string): Promise<void> {
-  await adminUpdatePlanOverride(userId, {
-    plan_override: null,
-    plan_override_reason: null,
-    plan_override_expires_at: null,
-  });
+  return { success: !error, error };
 }

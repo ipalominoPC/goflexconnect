@@ -1,4 +1,4 @@
-export interface Project {
+﻿export interface Project {
   id: string;
   name: string;
   location?: string;
@@ -11,7 +11,8 @@ export interface Project {
   floorPlanImage?: string;
   floorPlanFilename?: string;
   createdAt: number;
-  updatedAt: number; status?: "active" | "closed";
+  updatedAt: number; 
+  status?: "active" | "closed";
 }
 
 export interface DonorAlignment {
@@ -64,7 +65,8 @@ export interface Floor {
   gridSize?: number;
   gridEnabled?: boolean;
   createdAt: number;
-  updatedAt: number; status?: "active" | "closed";
+  updatedAt: number; 
+  status?: "active" | "closed";
 }
 
 export interface GridPoint {
@@ -124,6 +126,8 @@ export interface Settings {
   plan?: 'free' | 'pro';
   autosaveEnabled?: boolean;
   sessionTimeoutMinutes?: number;
+  benchmarkMode?: boolean;
+  rsrpTarget?: number;
 }
 
 export type MetricType = 'rsrp' | 'rsrq' | 'sinr' | 'rssi';
@@ -190,4 +194,3 @@ export interface SurveyInsight {
   improvementNotes?: any;
   createdAt: string;
 }
-

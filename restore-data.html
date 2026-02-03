@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head><title>Restore GoFlexConnect Data</title></head>
+<body>
+<h1>GoFlexConnect Data Restore</h1>
+<button onclick="checkData()">Check Supabase Data</button>
+<button onclick="checkLocalStorage()">Check Browser Storage</button>
+<button onclick="restoreFromSupabase()">Restore from Supabase</button>
+<pre id="output"></pre>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const supabase = window.supabase.createClient(
+  'https://chxyszjgvdgftrowveka.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoeHlzempndmRnZnRyb3d2ZWthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MjA3NTMsImV4cCI6MjA4MDk5Njc1M30.fBzYmmj9JcUtEHE1qaI61hb9h5s5xN1FWCv_mayYxlQ'
+);
+
+async function checkData() {
+  const out = document.getElementById('output');
+  out.textContent = 'Checking Supabase...\n';
+  
+  const { data: projects, error } = await supabase.from('projects').select('*');
+  out.textContent += `\nProjects in Supabase: ${projects?.length || 0}\n`;
+  if (projects) out.textContent += JSON.stringify(projects, null, 2);
+  if (error) out.textContent += '\nError: ' + JSON.stringify(error);
+}
+
+function checkLocalStorage() {
+  const out = document.getElementById('output');
+  const stored = localStorage.getItem('goflexconnect-storage');
+  out.textContent = 'LocalStorage Data:\n' + (stored || 'EMPTY');
+}
+
+async function restoreFromSupabase() {
+  const out = document.getElementById('output');
+  out.textContent = 'Restoring from Supabase...\n';
+  
+  const { data: projects } = await supabase.from('projects').select('*');
+  const { data: floors } = await supabase.from('floors').select('*');
+  const { data: measurements } = await supabase.from('measurements').select('*');
+  
+  const restored = {
+    state: {
+      projects: projects || [],
+      floors: floors || [],
+      measurements: measurements || [],
+      settings: { thresholds: { rsrp: { good: -90, fair: -110 }, sinr: { good: 10, fair: 0 } }, defaultMetric: 'rsrp', benchmarkMode: false, rsrpTarget: -95 },
+      hasCompletedOnboarding: true,
+      currentProjectId: null,
+      user: null,
+      currentUserId: null
+    },
+    version: 0
+  };
+  
+  localStorage.setItem('goflexconnect-storage', JSON.stringify(restored));
+  out.textContent += `\nRestored:\n- ${projects?.length || 0} projects\n- ${floors?.length || 0} floors\n- ${measurements?.length || 0} measurements\n\nRELOAD YOUR APP NOW!`;
+}
+</script>
+</body>
+</html>

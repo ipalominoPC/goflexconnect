@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="GoFlex chat pill">
+  <defs>
+    <!-- Cloud gradient (brand-like) -->
+    <linearGradient id="cloudGrad" x1="90" y1="120" x2="420" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5FE6FF"></stop>
+      <stop offset="0.55" stop-color="#1FC2F0"></stop>
+      <stop offset="1" stop-color="#0178B7"></stop>
+    </linearGradient>
+
+    <!-- Soft highlight inside cloud -->
+    <radialGradient id="cloudInner" cx="35%" cy="25%" r="80%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"></stop>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"></stop>
+    </radialGradient>
+
+    <!-- Pill gradient (dark, glossy) -->
+    <linearGradient id="pillGrad" x1="160" y1="275" x2="352" y2="355" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B0F1A"></stop>
+      <stop offset="0.55" stop-color="#111827"></stop>
+      <stop offset="1" stop-color="#060A12"></stop>
+    </linearGradient>
+
+    <!-- Pill highlight -->
+    <linearGradient id="pillHi" x1="190" y1="285" x2="340" y2="320" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"></stop>
+      <stop offset="0.6" stop-color="#FFFFFF" stop-opacity="0.08"></stop>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"></stop>
+    </linearGradient>
+  </defs>
+
+  <!-- Transparent background by default (SVG has no fill behind) -->
+
+  <!-- Cloud shape -->
+  <path d="M170 404c-64 0-116-48-116-107 0-54 43-98 98-106 13-56 66-98 129-98 67 0 123 47 132 110 49 10 85 52 85 102 0 59-52 99-118 99H170z" fill="url(#cloudGrad)"></path>
+
+  <!-- Inner soft glow -->
+  <path d="M170 404c-64 0-116-48-116-107 0-54 43-98 98-106 13-56 66-98 129-98 67 0 123 47 132 110 49 10 85 52 85 102 0 59-52 99-118 99H170z" fill="url(#cloudInner)"></path>
+
+  <!-- Pill recess (subtle lighter cavity) -->
+  <rect x="128" y="248" width="256" height="132" rx="66" fill="#0A3A58" opacity="0.16"></rect>
+
+  <!-- Main pill -->
+  <rect x="160" y="272" width="192" height="88" rx="44" fill="url(#pillGrad)"></rect>
+
+  <!-- Pill highlight -->
+  <path d="M196 294c12-12 29-18 47-18h76c18 0 35 6 47 18 4 4 2 10-3 10H199c-5 0-7-6-3-10z" fill="url(#pillHi)"></path>
+</svg>

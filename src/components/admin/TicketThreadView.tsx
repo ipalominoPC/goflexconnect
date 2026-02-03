@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, CheckCircle2, Sparkles, User, Headphones } from 'lucide-react';
+﻿import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Send, CheckCircle2, User, Headphones, Map as MapIcon, Zap } from 'lucide-react';
 import {
   getTicketById,
   getTicketMessages,
@@ -9,31 +9,25 @@ import {
   TicketMessage,
   getCategoryLabel,
   getStatusInfo,
-  SupportStatus,
 } from '../../services/supportService';
 
 interface TicketThreadViewProps {
   ticketId: string;
   onClose: () => void;
+  onViewProject?: (projectId: string) => void;
 }
 
-export default function TicketThreadView({ ticketId, onClose }: TicketThreadViewProps) {
+export default function TicketThreadView({ ticketId, onClose, onViewProject }: TicketThreadViewProps) {
   const [ticket, setTicket] = useState<AdminSupportTicket | null>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [resolving, setResolving] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadTicketData();
-  }, [ticketId]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  useEffect(() => { loadTicketData(); }, [ticketId]);
+  useEffect(() => { scrollToBottom(); }, [messages]);
 
   const loadTicketData = async () => {
     try {
@@ -44,209 +38,97 @@ export default function TicketThreadView({ ticketId, onClose }: TicketThreadView
       ]);
       setTicket(ticketData);
       setMessages(messagesData);
-    } catch (error) {
-      console.error('Error loading ticket data:', error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
 
   const handleSendReply = async () => {
     if (!replyText.trim() || !ticket) return;
-
     try {
       setSending(true);
       await sendAdminReply(ticketId, replyText.trim());
       setReplyText('');
       await loadTicketData();
-    } catch (error) {
-      console.error('Error sending reply:', error);
-      alert('Failed to send reply');
-    } finally {
-      setSending(false);
-    }
+    } catch (e) { alert('Failed to send reply'); } finally { setSending(false); }
   };
 
   const handleResolve = async () => {
-    if (!ticket) return;
-
     try {
       setResolving(true);
       await resolveTicket(ticketId);
-
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 4000);
-
       await loadTicketData();
-    } catch (error) {
-      console.error('Error resolving ticket:', error);
-      alert('Failed to resolve ticket');
-    } finally {
-      setResolving(false);
-    }
+    } catch (e) { alert('Failed to resolve'); } finally { setResolving(false); }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSendReply();
-    }
-  };
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#27AAE1]"></div>
-      </div>
-    );
-  }
-
-  if (!ticket) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-slate-500 dark:text-slate-400">Ticket not found</p>
-      </div>
-    );
-  }
+  if (loading || !ticket) return <div className="p-10 text-center animate-pulse text-[#27AAE1]">Opening Secure Line...</div>;
 
   const statusInfo = getStatusInfo(ticket.status);
   const isResolved = ticket.status === 'resolved' || ticket.status === 'closed';
 
   return (
-    <div className="space-y-6 pb-6">
-      {showConfetti && <ConfettiAnimation />}
-
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-4 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Back to Inbox
+    <div className="space-y-6 pb-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* MISSION CONTROL HEADER */}
+      <div className="bg-slate-900 border border-[#27AAE1]/30 rounded-[2rem] p-8 shadow-[0_0_30px_rgba(39,170,225,0.1)]">
+        <button onClick={onClose} className="flex items-center gap-2 text-slate-500 hover:text-[#27AAE1] mb-6 uppercase text-[10px] font-black tracking-widest transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back to Radar
         </button>
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col md:flex-row items-start justify-between gap-6">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                {ticket.subject || 'Support Ticket'}
+              <h2 className="text-3xl font-black italic tracking-tighter text-white">
+                {ticket.subject || 'Inbound Request'}
               </h2>
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-                  statusInfo.color === 'blue'
-                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                    : statusInfo.color === 'yellow'
-                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                    : statusInfo.color === 'green'
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300'
-                }`}
-              >
+              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-${statusInfo.color}-500/10 text-${statusInfo.color}-500 border border-${statusInfo.color}-500/20`}>
                 {statusInfo.label}
               </span>
             </div>
-
-            <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
-              <span className="font-mono text-[#27AAE1] font-semibold">
-                {ticket.ticketNumber || `#${ticket.id.slice(0, 8)}`}
-              </span>
-              <span>•</span>
-              <span>{getCategoryLabel(ticket.category)}</span>
-              <span>•</span>
-              <span>{formatDate(ticket.createdAt)}</span>
-            </div>
-
-            <div className="mt-3">
-              <p className="text-slate-700 dark:text-slate-300">
-                <strong>{ticket.name}</strong> ({ticket.email})
-              </p>
-              {ticket.phone && (
-                <p className="text-sm text-slate-600 dark:text-slate-400">{ticket.phone}</p>
-              )}
+            <p className="text-[#27AAE1] font-mono text-xs font-bold mb-4">{ticket.ticketNumber || `#${ticket.id.slice(0, 8)}`}</p>
+            
+            <div className="p-4 bg-black/40 rounded-2xl border border-white/5 inline-block">
+              <p className="text-sm font-bold text-white">{ticket.name}</p>
+              <p className="text-xs text-slate-500">{ticket.email}</p>
             </div>
           </div>
 
-          {!isResolved && (
-            <button
-              onClick={handleResolve}
-              disabled={resolving}
-              className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              {resolving ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Resolving...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>Resolve Ticket</span>
-                </>
-              )}
-            </button>
-          )}
+          <div className="flex flex-wrap gap-3">
+            {/* THE TELEPORT BUTTON */}
+            {ticket.projectId && (
+              <button 
+                onClick={() => onViewProject?.(ticket.projectId!)}
+                className="flex items-center gap-2 px-6 py-4 bg-[#27AAE1] text-white font-black rounded-2xl shadow-[0_0_20px_rgba(39,170,225,0.4)] hover:scale-105 active:scale-95 transition-all uppercase text-[10px] tracking-widest"
+              >
+                <Zap className="w-5 h-5 fill-white" />
+                Teleport to Site Data
+              </button>
+            )}
+
+            {!isResolved && (
+              <button onClick={handleResolve} className="flex items-center gap-2 px-6 py-4 bg-green-600/10 border border-green-600/30 text-green-500 font-black rounded-2xl hover:bg-green-600 hover:text-white transition-all uppercase text-[10px] tracking-widest">
+                <CheckCircle2 className="w-5 h-5" />
+                Resolve
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Messages Thread */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Conversation</h3>
-
-        <div className="space-y-4 max-h-[500px] overflow-y-auto">
-          {messages.map((message, index) => {
-            const isCustomer = message.senderType === 'customer';
+      {/* MESSAGES */}
+      <div className="bg-slate-900/50 border border-white/5 rounded-[2rem] p-8">
+        <div className="space-y-6 max-h-[400px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-white/10">
+          {messages.map((msg, i) => {
+            const isCustomer = msg.senderType === 'customer';
             return (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${isCustomer ? 'flex-row' : 'flex-row-reverse'}`}
-              >
-                <div
-                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                    isCustomer
-                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                      : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                  }`}
-                >
-                  {isCustomer ? (
-                    <User className="w-5 h-5" />
-                  ) : (
-                    <Headphones className="w-5 h-5" />
-                  )}
+              <div key={i} className={`flex gap-4 ${isCustomer ? '' : 'flex-row-reverse'}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${isCustomer ? 'bg-blue-500/10 border-blue-500/20 text-blue-500' : 'bg-[#27AAE1]/10 border-[#27AAE1]/20 text-[#27AAE1]'}`}>
+                  {isCustomer ? <User className="w-5 h-5" /> : <Headphones className="w-5 h-5" />}
                 </div>
-
-                <div className={`flex-1 ${isCustomer ? 'text-left' : 'text-right'}`}>
-                  <div className="flex items-center gap-2 mb-1" style={{ justifyContent: isCustomer ? 'flex-start' : 'flex-end' }}>
-                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                      {message.senderName}
-                    </span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {formatDate(message.createdAt)}
-                    </span>
-                  </div>
-
-                  <div
-                    className={`inline-block max-w-[80%] rounded-2xl px-4 py-3 ${
-                      isCustomer
-                        ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white rounded-tl-none'
-                        : 'bg-[#27AAE1] text-white rounded-tr-none'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.message}</p>
-                  </div>
+                <div className={`max-w-[80%] ${isCustomer ? 'text-left' : 'text-right'}`}>
+                   <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">{msg.senderName} • {new Date(msg.createdAt).toLocaleTimeString()}</p>
+                   <div className={`px-5 py-4 rounded-2xl text-sm ${isCustomer ? 'bg-slate-800 text-white rounded-tl-none' : 'bg-[#27AAE1] text-white rounded-tr-none'}`}>
+                     {msg.message}
+                   </div>
                 </div>
               </div>
             );
@@ -255,87 +137,21 @@ export default function TicketThreadView({ ticketId, onClose }: TicketThreadView
         </div>
       </div>
 
-      {/* Reply Box */}
       {!isResolved && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Send Reply</h3>
-          <div className="space-y-4">
-            <textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={5}
-              placeholder="Type your reply here... (Cmd+Enter to send)"
-              className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-[#27AAE1]/40 resize-none"
-              disabled={sending}
-            />
-
-            <div className="flex justify-end">
-              <button
-                onClick={handleSendReply}
-                disabled={sending || !replyText.trim()}
-                className="flex items-center gap-2 px-6 py-3 bg-[#27AAE1] hover:bg-[#0178B7] disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all duration-200"
-              >
-                {sending ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Sending...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    <span>Send Reply</span>
-                  </>
-                )}
-              </button>
-            </div>
+        <div className="bg-slate-900 border border-white/5 rounded-[2rem] p-8">
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white outline-none focus:border-[#27AAE1]/50 transition-all mb-4 min-h-[120px]"
+            placeholder="TYPE SUPPORT RESPONSE..."
+          />
+          <div className="flex justify-end">
+            <button onClick={handleSendReply} disabled={sending || !replyText.trim()} className="px-10 py-4 bg-[#27AAE1] text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase text-[10px] tracking-widest">
+              {sending ? 'SENDING...' : 'SEND RESPONSE'}
+            </button>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function ConfettiAnimation() {
-  return (
-    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-      {[...Array(50)].map((_, i) => (
-        <div
-          key={i}
-          className="absolute animate-confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: '-10%',
-            animationDelay: `${Math.random() * 0.5}s`,
-            animationDuration: `${2 + Math.random() * 2}s`,
-          }}
-        >
-          <div
-            className="w-2 h-2 rounded-full"
-            style={{
-              backgroundColor: ['#27AAE1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][
-                Math.floor(Math.random() * 5)
-              ],
-              transform: `rotate(${Math.random() * 360}deg)`,
-            }}
-          />
-        </div>
-      ))}
-      <style>{`
-        @keyframes confetti {
-          0% {
-            transform: translateY(0) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(100vh) rotate(720deg);
-            opacity: 0;
-          }
-        }
-        .animate-confetti {
-          animation: confetti linear forwards;
-        }
-      `}</style>
     </div>
   );
 }

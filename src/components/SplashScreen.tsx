@@ -16,7 +16,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
               className="h-28 w-28 rounded-[28px] shadow-[0_0_30px_rgba(39,170,225,0.4)] border border-[#27AAE1]/20"
             />
           </div>
-          <h1 className="text-4xl font-black text-white mb-2 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+          <h1 className="text-4xl font-black text-white mb-2 tracking-tight" >
             GoFlexConnect
           </h1>
           <p className="text-[#27AAE1] text-[10px] font-bold uppercase tracking-[0.4em] opacity-80">RF Intelligence</p>
@@ -25,11 +25,11 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
         <div className="animate-slideUp">
           {/* ANIMATED SIGNAL BARS */}
           <div className="flex items-end justify-center gap-1.5 mb-12 h-10">
-            <div className="signal-bar delay-1 w-2 h-3 shadow-[0_0_10px_#27AAE1]"></div>
-            <div className="signal-bar delay-2 w-2 h-5 shadow-[0_0_10px_#27AAE1]"></div>
-            <div className="signal-bar delay-3 w-2 h-7 shadow-[0_0_10px_#27AAE1]"></div>
-            <div className="signal-bar delay-4 w-2 h-9 shadow-[0_0_10px_#27AAE1]"></div>
-            <div className="signal-bar delay-5 w-2 h-11 shadow-[0_0_10px_#27AAE1]"></div>
+            <div className="animate-signal-1 w-2 h-3 bg-[#27AAE1] rounded-t-sm"></div>
+            <div className="animate-signal-2 w-2 h-5 bg-[#27AAE1] rounded-t-sm"></div>
+            <div className="animate-signal-3 w-2 h-7 bg-[#27AAE1] rounded-t-sm"></div>
+            <div className="animate-signal-4 w-2 h-9 bg-[#27AAE1] rounded-t-sm"></div>
+            <div className="animate-signal-5 w-2 h-11 bg-[#27AAE1] rounded-t-sm"></div>
           </div>
 
           <p className="text-sm text-slate-400 font-medium max-w-xs mx-auto leading-relaxed mb-12 uppercase tracking-widest" style={{ fontFamily: 'Roboto, sans-serif' }}>
@@ -48,3 +48,4 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
     </div>
   );
 }
+

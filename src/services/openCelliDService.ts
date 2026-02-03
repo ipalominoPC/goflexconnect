@@ -1,3 +1,5 @@
+﻿// src/services/openCelliDService.ts
+
 export interface CellTower {
   cellId: string;
   mcc: number;
@@ -7,10 +9,7 @@ export interface CellTower {
   lon: number;
   range: number;
   samples: number;
-  changeable: number;
   radio: string;
-  unit: number;
-  created: number;
   updated: number;
   averageSignal: number;
 }
@@ -22,7 +21,17 @@ export interface CellTowerWithDistance extends CellTower {
   frequency: string;
 }
 
-const OPENCELLID_API_KEY = import.meta.env.VITE_OPENCELLID_API_KEY || '';
+interface DebugInfo {
+  requestUrl: string;
+  bbox: string;
+  statusCode: number;
+  rawCellCount: number;
+  timestamp: string;
+  errorMessage?: string;
+}
+
+const OPENCELLID_API_KEY = 'pk.ec2ef5caa5a9e20fec647cd9220cfc93';
+const DEBUG_MODE = true;
 
 const radioTechMap: Record<string, string> = {
   'GSM': '2G GSM',
@@ -32,68 +41,31 @@ const radioTechMap: Record<string, string> = {
   'CDMA': 'CDMA',
 };
 
-const mccOperatorMap: Record<number, Record<number, string>> = {
-  310: {
-    410: 'AT&T',
-    260: 'T-Mobile',
-    160: 'T-Mobile',
-    200: 'T-Mobile',
-    210: 'T-Mobile',
-    220: 'T-Mobile',
-    230: 'T-Mobile',
-    240: 'T-Mobile',
-    250: 'T-Mobile',
-    260: 'T-Mobile',
-    270: 'T-Mobile',
-    280: 'T-Mobile',
-    290: 'T-Mobile',
-    300: 'T-Mobile',
-    310: 'T-Mobile',
-    800: 'T-Mobile',
-    490: 'T-Mobile',
-    4: 'Verizon',
-    5: 'Verizon',
-    6: 'Verizon',
-    10: 'Verizon',
-    12: 'Verizon',
-    13: 'Verizon',
-    590: 'Verizon',
-    890: 'Verizon',
-    910: 'Verizon',
-    120: 'Sprint',
+const mccOperatorMap: Record<string, Record<string, string>> = {
+  "310": {
+    "260": "T-Mobile",
+    "160": "T-Mobile",
+    "240": "T-Mobile",
+    "120": "Sprint",
+    "410": "AT&T",
+    "030": "AT&T",
+    "150": "AT&T",
+    "170": "AT&T",
+    "280": "AT&T",
+    "004": "Verizon",
+    "005": "Verizon",
+    "010": "Verizon",
+    "012": "Verizon",
+    "013": "Verizon",
+    "480": "Verizon"
   },
-  311: {
-    480: 'Verizon',
-    481: 'Verizon',
-    482: 'Verizon',
-    483: 'Verizon',
-    484: 'Verizon',
-    485: 'Verizon',
-    486: 'Verizon',
-    487: 'Verizon',
-    488: 'Verizon',
-    489: 'Verizon',
-  },
-};
-
-const frequencyMap: Record<string, Record<string, string>> = {
-  'GSM': {
-    'default': '850/900/1800/1900 MHz',
-  },
-  'UMTS': {
-    'default': '850/1900/2100 MHz',
-  },
-  'LTE': {
-    'AT&T': '700/850/1700/1900/2300 MHz',
-    'Verizon': '700/850/1900/2500 MHz',
-    'T-Mobile': '600/700/1700/1900/2500 MHz',
-    'default': '700/850/1700/1900/2500 MHz',
-  },
-  'NR': {
-    'AT&T': '3.7 GHz (C-Band), mmWave',
-    'Verizon': '3.7 GHz (C-Band), mmWave',
-    'T-Mobile': '2.5/3.7 GHz, 600 MHz',
-    'default': '2.5/3.7 GHz (C-Band)',
+  "311": {
+    "480": "Verizon",
+    "481": "Verizon",
+    "482": "Verizon",
+    "483": "Verizon",
+    "484": "Verizon",
+    "485": "Verizon"
   },
 };
 
@@ -103,30 +75,20 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+    Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
 function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
-  const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+  const x =
+    Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
     Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
-  let bearing = Math.atan2(y, x) * 180 / Math.PI;
-  bearing = (bearing + 360) % 360;
-  return bearing;
-}
-
-function getOperatorName(mcc: number, mnc: number): string {
-  return mccOperatorMap[mcc]?.[mnc] || 'Unknown Carrier';
-}
-
-function getFrequencyInfo(radio: string, operator: string): string {
-  const radioFreqs = frequencyMap[radio];
-  if (!radioFreqs) return 'Unknown';
-  return radioFreqs[operator] || radioFreqs['default'] || 'Unknown';
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
 export async function getNearbyCellTowers(
@@ -135,127 +97,196 @@ export async function getNearbyCellTowers(
   radiusKm: number = 5
 ): Promise<CellTowerWithDistance[]> {
   if (!OPENCELLID_API_KEY) {
-    console.warn('OpenCelliD API key not configured');
+    console.warn('⚠️ No OpenCellID API key - using mock data');
     return generateMockTowers(latitude, longitude);
   }
 
   try {
-    const latDelta = radiusKm / 111;
-    const lonDelta = radiusKm / (111 * Math.cos(latitude * Math.PI / 180));
+    const latDelta = (radiusKm / 111.32) * 1.2;
+    const lonDelta = (radiusKm / (111.32 * Math.cos(latitude * Math.PI / 180))) * 1.2;
 
-    const bbox = [
-      latitude - latDelta,
-      longitude - lonDelta,
-      latitude + latDelta,
-      longitude + lonDelta,
-    ].join(',');
+    const minLon = (longitude - lonDelta).toFixed(6);
+    const minLat = (latitude - latDelta).toFixed(6);
+    const maxLon = (longitude + lonDelta).toFixed(6);
+    const maxLat = (latitude + latDelta).toFixed(6);
 
-    const url = `https://opencellid.org/cell/getInArea?key=${OPENCELLID_API_KEY}&BBOX=${bbox}&format=json`;
+    const bbox = `${minLon},${minLat},${maxLon},${maxLat}`;
+    const url = `https://opencellid.org/ajax/searchCell.php?key=${OPENCELLID_API_KEY}&BBOX=${bbox}&format=json&limit=50`;
 
-    const response = await fetch(url);
+    if (DEBUG_MODE) {
+      console.group('🛰️ OpenCellID API Request');
+      console.log('📍 Center:', { latitude, longitude });
+      console.log('📏 Radius:', `${radiusKm}km`);
+      console.log('📦 BBOX (W,S,E,N):', bbox);
+      console.log('🔗 URL:', url);
+    }
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'GoFlexConnect/1.0 (Android; Samsung S24)',
+      },
+    });
+
+    const debugInfo: DebugInfo = {
+      requestUrl: url,
+      bbox,
+      statusCode: response.status,
+      rawCellCount: 0,
+      timestamp: new Date().toISOString(),
+    };
 
     if (!response.ok) {
-      console.error('OpenCelliD API error:', response.status);
+      debugInfo.errorMessage = `HTTP ${response.status}`;
+      if (DEBUG_MODE) {
+        console.error('❌ API Error:', debugInfo);
+        console.groupEnd();
+      }
       return generateMockTowers(latitude, longitude);
     }
 
     const data = await response.json();
+    
+    if (DEBUG_MODE) {
+      console.log('📊 Response Status:', response.status);
+      console.log('📄 Raw Data:', data);
+    }
 
-    if (!data.cells || data.cells.length === 0) {
-      console.warn('No cell towers found in area');
+    const cells = data.cells || data.data || data;
+    
+    if (!Array.isArray(cells) || cells.length === 0) {
+      debugInfo.rawCellCount = 0;
+      if (DEBUG_MODE) {
+        console.warn('⚠️ No cells found in response');
+        console.log('🔍 Debug Info:', debugInfo);
+        console.groupEnd();
+      }
       return generateMockTowers(latitude, longitude);
     }
 
-    const towers: CellTowerWithDistance[] = data.cells
-      .map((cell: CellTower) => {
-        const distance = calculateDistance(latitude, longitude, cell.lat, cell.lon);
-        const bearing = calculateBearing(latitude, longitude, cell.lat, cell.lon);
-        const operator = getOperatorName(cell.mcc, cell.mnc);
-        const technology = radioTechMap[cell.radio] || cell.radio;
-        const frequency = getFrequencyInfo(cell.radio, operator);
+    debugInfo.rawCellCount = cells.length;
+
+    if (DEBUG_MODE) {
+      console.log('✅ Cells Found:', cells.length);
+      console.log('🎯 First Cell Sample:', cells[0]);
+      console.groupEnd();
+    }
+
+    const processedTowers = cells
+      .map((cell: any) => {
+        const cellLat = Number(cell.lat);
+        const cellLon = Number(cell.lon);
+        
+        if (isNaN(cellLat) || isNaN(cellLon)) return null;
+
+        const mcc = String(cell.mcc || '310');
+        const mnc = String(cell.net || cell.mnc || '000');
+        const radio = String(cell.radio || 'LTE').toUpperCase();
+        
+        const operator =
+          mccOperatorMap[mcc]?.[mnc] ||
+          mccOperatorMap[mcc]?.[mnc.padStart(3, '0')] ||
+          `Node ${mcc}-${mnc}`;
 
         return {
-          ...cell,
-          distance,
-          bearing,
+          cellId: String(cell.cell || cell.cellid || Math.random().toString(36).substr(2, 9)),
+          mcc: Number(cell.mcc) || 310,
+          mnc: Number(cell.net || cell.mnc) || 0,
+          lac: Number(cell.area || cell.lac) || 0,
+          lat: cellLat,
+          lon: cellLon,
+          range: Number(cell.range) || 1000,
+          samples: Number(cell.samples) || 1,
+          radio: radioTechMap[radio] || radio,
+          updated: Number(cell.updated) || Date.now(),
+          averageSignal: Number(cell.averageSignal) || -85,
+          distance: calculateDistance(latitude, longitude, cellLat, cellLon),
+          bearing: calculateBearing(latitude, longitude, cellLat, cellLon),
           operator,
-          frequency,
-          technology,
+          frequency: radio === 'LTE' ? 'LTE-A' : radio === 'NR' ? 'n41' : 'Sub-6',
         };
       })
-      .sort((a: CellTowerWithDistance, b: CellTowerWithDistance) => a.distance - b.distance)
-      .slice(0, 10);
+      .filter((tower): tower is CellTowerWithDistance => tower !== null)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 30);
 
-    return towers;
+    if (DEBUG_MODE) {
+      console.log('📡 Final Tower Count:', processedTowers.length);
+      if (processedTowers.length > 0) {
+        console.log('🎯 Nearest Tower:', {
+          operator: processedTowers[0].operator,
+          distance: `${processedTowers[0].distance.toFixed(2)}km`,
+          bearing: `${processedTowers[0].bearing.toFixed(0)}°`,
+        });
+      }
+    }
+
+    return processedTowers.length > 0 ? processedTowers : generateMockTowers(latitude, longitude);
   } catch (error) {
-    console.error('Error fetching cell towers:', error);
+    if (DEBUG_MODE) {
+      console.error('❌ OpenCellID Fetch Error:', error);
+    }
     return generateMockTowers(latitude, longitude);
   }
 }
 
-function generateMockTowers(latitude: number, longitude: number): CellTowerWithDistance[] {
-  const mockTowers: CellTowerWithDistance[] = [
+function generateMockTowers(lat: number, lon: number): CellTowerWithDistance[] {
+  if (DEBUG_MODE) {
+    console.warn('🔄 Falling back to MOCK DATA');
+  }
+  
+  return [
     {
-      cellId: '12345678',
-      mcc: 310,
-      mnc: 410,
-      lac: 1000,
-      lat: latitude + 0.007,
-      lon: longitude + 0.007,
+      cellId: 'MOCK-VZW-001',
+      mcc: 311,
+      mnc: 480,
+      lac: 1,
+      lat: lat + 0.003,
+      lon: lon + 0.003,
       range: 1000,
-      samples: 50,
-      changeable: 1,
-      radio: 'NR',
-      unit: 1,
-      created: Date.now(),
+      samples: 1,
+      radio: '4G LTE',
       updated: Date.now(),
       averageSignal: -75,
-      distance: 0.8,
-      bearing: 45,
-      operator: 'AT&T',
-      frequency: '3.7 GHz (C-Band), mmWave',
+      distance: 0.4,
+      bearing: 30,
+      operator: 'Verizon (Simulated)',
+      frequency: 'B13',
     },
     {
-      cellId: '23456789',
-      mcc: 310,
-      mnc: 4,
-      lac: 2000,
-      lat: latitude + 0.01,
-      lon: longitude - 0.005,
-      range: 1500,
-      samples: 75,
-      changeable: 1,
-      radio: 'LTE',
-      unit: 1,
-      created: Date.now(),
-      updated: Date.now(),
-      averageSignal: -85,
-      distance: 1.2,
-      bearing: 135,
-      operator: 'Verizon',
-      frequency: '700/850/1900/2500 MHz',
-    },
-    {
-      cellId: '34567890',
+      cellId: 'MOCK-TMO-001',
       mcc: 310,
       mnc: 260,
-      lac: 3000,
-      lat: latitude - 0.005,
-      lon: longitude - 0.009,
-      range: 800,
-      samples: 100,
-      changeable: 1,
-      radio: 'NR',
-      unit: 1,
-      created: Date.now(),
+      lac: 1,
+      lat: lat - 0.004,
+      lon: lon - 0.002,
+      range: 1000,
+      samples: 1,
+      radio: '5G NR',
       updated: Date.now(),
-      averageSignal: -68,
-      distance: 0.5,
-      bearing: 270,
-      operator: 'T-Mobile',
-      frequency: '2.5/3.7 GHz, 600 MHz',
+      averageSignal: -82,
+      distance: 0.6,
+      bearing: 200,
+      operator: 'T-Mobile (Simulated)',
+      frequency: 'n41',
+    },
+    {
+      cellId: 'MOCK-ATT-001',
+      mcc: 310,
+      mnc: 410,
+      lac: 1,
+      lat: lat + 0.005,
+      lon: lon - 0.004,
+      range: 1000,
+      samples: 1,
+      radio: '4G LTE',
+      updated: Date.now(),
+      averageSignal: -88,
+      distance: 0.8,
+      bearing: 310,
+      operator: 'AT&T (Simulated)',
+      frequency: 'B2',
     },
   ];
-
-  return mockTowers;
 }

@@ -1,4 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+﻿import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,210 +6,66 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-interface EmailRequest {
-  to: string | string[];
-  cc?: string | string[];
-  replyTo?: string;
-  subject: string;
-  html: string;
-  text?: string;
-}
-
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { to, cc, replyTo, subject, html, text }: EmailRequest = await req.json();
+    const { to, subject, html } = await req.json();
 
-    console.log('[send-email] Received request');
-    console.log('[send-email] To:', to);
-    console.log('[send-email] CC:', cc);
-    console.log('[send-email] Subject:', subject);
-    console.log('[send-email] HTML length:', html?.length || 0);
+    const smtpHost = Deno.env.get("SMTP_HOST") || "smtp.ionos.com";
+    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
+    const smtpUser = Deno.env.get("SMTP_USER");
+    const smtpPass = Deno.env.get("SMTP_PASS");
 
-    if (!to || !subject || !html) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields: to, subject, html" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    if (!smtpUser || !smtpPass) throw new Error("Cloud Secrets Missing");
 
-    // Normalize recipients to arrays
     const toRecipients = Array.isArray(to) ? to : [to];
-    const ccRecipients = cc ? (Array.isArray(cc) ? cc : [cc]) : [];
-    const allRecipients = [...toRecipients, ...ccRecipients];
+    let conn = await Deno.connect({ hostname: smtpHost, port: smtpPort });
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const buffer = new Uint8Array(4096);
 
-    if (allRecipients.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No recipients specified" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const read = async () => decoder.decode(buffer.subarray(0, await conn.read(buffer) || 0));
+    const send = async (cmd: string) => { await conn.write(encoder.encode(cmd + "\r\n")); return await read(); };
 
-    // SMTP credentials
-    const smtpHost = "smtp.ionos.com";
-    const smtpPort = 587;
-    const smtpUser = "support@goflexconnect.com";
-    const smtpPass = "El3m3nt&149@3050";
+    await read();
+    await send("EHLO goflexconnect.com");
+    await send("STARTTLS");
 
-    console.log('[send-email] SMTP config:', { host: smtpHost, port: smtpPort, user: smtpUser });
+    const tlsConn = await Deno.startTls(conn, { hostname: smtpHost });
+    const readTls = async () => decoder.decode(buffer.subarray(0, await tlsConn.read(buffer) || 0));
+    const sendTls = async (cmd: string) => { await tlsConn.write(encoder.encode(cmd + "\r\n")); return await readTls(); };
 
-    // Validate SMTP credentials exist
-    if (!smtpUser || !smtpPass) {
-      return new Response(
-        JSON.stringify({
-          error: "SMTP configuration missing",
-          details: "Email credentials not configured"
-        }),
-        {
-          status: 503,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    await sendTls("EHLO goflexconnect.com");
+    await sendTls("AUTH LOGIN");
+    await sendTls(btoa(smtpUser));
+    await sendTls(btoa(smtpPass));
+    await sendTls(`MAIL FROM:<${smtpUser}>`);
+    for (const r of toRecipients) await sendTls(`RCPT TO:<${r}>`);
+    await sendTls("DATA");
 
-    let conn;
-    let tlsConn;
+    const headers = [
+      `From: GoFlexConnect Support <${smtpUser}>`,
+      `To: ${toRecipients.join(", ")}`,
+      `Subject: ${subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/html; charset=utf-8",
+      ""
+    ].join("\r\n");
 
-    try {
-      // Create SMTP connection with timeout
-      conn = await Deno.connect({
-        hostname: smtpHost,
-        port: smtpPort,
-      });
+    await tlsConn.write(encoder.encode(headers + "\r\n" + html + "\r\n.\r\n"));
+    await readTls();
+    await sendTls("QUIT");
+    tlsConn.close();
 
-      const encoder = new TextEncoder();
-      const decoder = new TextDecoder();
-      const buffer = new Uint8Array(4096);
-
-      // Read response helper
-      const readResponse = async () => {
-        const n = await conn!.read(buffer);
-        if (n === null) throw new Error("Connection closed");
-        return decoder.decode(buffer.subarray(0, n));
-      };
-
-      // Send command helper
-      const sendCommand = async (command: string) => {
-        await conn!.write(encoder.encode(command + "\r\n"));
-        return await readResponse();
-      };
-
-      // SMTP handshake
-      await readResponse(); // Read initial greeting
-      await sendCommand("EHLO goflexconnect.com");
-      await sendCommand("STARTTLS");
-
-      // Upgrade to TLS
-      tlsConn = await Deno.startTls(conn, { hostname: smtpHost });
-
-      // Re-create encoder/decoder for TLS connection
-      const tlsBuffer = new Uint8Array(4096);
-      const readTlsResponse = async () => {
-        const n = await tlsConn!.read(tlsBuffer);
-        if (n === null) throw new Error("Connection closed");
-        return decoder.decode(tlsBuffer.subarray(0, n));
-      };
-
-      const sendTlsCommand = async (command: string) => {
-        await tlsConn!.write(encoder.encode(command + "\r\n"));
-        return await readTlsResponse();
-      };
-
-      // Continue SMTP conversation over TLS
-      await sendTlsCommand("EHLO goflexconnect.com");
-      await sendTlsCommand("AUTH LOGIN");
-      await sendTlsCommand(btoa(smtpUser));
-      await sendTlsCommand(btoa(smtpPass));
-
-      // Send email to all recipients
-      await sendTlsCommand(`MAIL FROM:<${smtpUser}>`);
-
-      // Add all recipients (to and cc)
-      for (const recipient of allRecipients) {
-        await sendTlsCommand(`RCPT TO:<${recipient}>`);
-      }
-
-      await sendTlsCommand("DATA");
-
-      // Build email with separate To, CC, and Reply-To headers
-      const emailHeaders = [
-        `From: GoFlexConnect Support <${smtpUser}>`,
-        `To: ${toRecipients.join(", ")}`,
-      ];
-
-      if (ccRecipients.length > 0) {
-        emailHeaders.push(`Cc: ${ccRecipients.join(", ")}`);
-      }
-
-      if (replyTo) {
-        emailHeaders.push(`Reply-To: ${replyTo}`);
-      }
-
-      emailHeaders.push(
-        `Subject: ${subject}`,
-        "MIME-Version: 1.0",
-        "Content-Type: text/html; charset=utf-8",
-        ""
-      );
-
-      const emailContent = [
-        ...emailHeaders,
-        html,
-        ".",
-      ].join("\r\n");
-
-      await sendTlsCommand(emailContent);
-      await sendTlsCommand("QUIT");
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: `Email sent successfully to ${allRecipients.length} recipient(s)`,
-          to: toRecipients.length,
-          cc: ccRecipients.length
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    } finally {
-      // Always close connections
-      try {
-        if (tlsConn) tlsConn.close();
-      } catch (e) {
-        console.error("Error closing TLS connection:", e);
-      }
-      try {
-        if (conn) conn.close();
-      } catch (e) {
-        console.error("Error closing connection:", e);
-      }
-    }
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
   } catch (error) {
-    console.error("Error sending email:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: "Failed to send email",
-        details: error instanceof Error ? error.message : String(error)
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
