@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Search, Users, RefreshCw, Loader2, User, Building2, Phone, Mail, Key, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
+import { Search, Users, RefreshCw, Loader2, User, Building2, Phone, Mail, Key, ChevronDown, ChevronUp, ShieldAlert, Wifi, Activity } from 'lucide-react';
 import { getFleetDirectory, resetUserOnboarding, triggerPasswordResetHQ, FleetMember } from '../../services/adminUserService';
+import { supabase } from '../../services/supabaseClient';
 
 export default function FleetDirectory() {
   const [members, setMembers] = useState<FleetMember[]>([]);
@@ -9,11 +10,29 @@ export default function FleetDirectory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   
+  // PHASE 4.7: LIVE SIGNAL OVERLAY STATE
+  const [liveSignals, setLiveSignals] = useState<Record<string, number>>({});
+  
   // IDENTITY GOVERNANCE STATE
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     loadDirectory();
+
+    // PHASE 4.7: REALTIME FLEET TELEMETRY UPLINK
+    const signalSubscription = supabase.channel('fleet-live-signals')
+      .on('postgres_changes', { event: 'INSERT', table: 'measurements', schema: 'public' }, (payload) => {
+        const newPing = payload.new;
+        if (newPing.user_id && typeof newPing.rsrp === 'number') {
+          setLiveSignals(prev => ({
+            ...prev,
+            [newPing.user_id]: newPing.rsrp
+          }));
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(signalSubscription); };
   }, []);
 
   useEffect(() => {
@@ -30,6 +49,12 @@ export default function FleetDirectory() {
     const data = await getFleetDirectory();
     setMembers(data);
     setLoading(false);
+  };
+
+  const getSignalColor = (rsrp: number) => {
+    if (rsrp >= -95) return 'text-green-500 border-green-500/30 bg-green-500/10 shadow-[0_0_10px_rgba(34,197,94,0.2)]';
+    if (rsrp >= -105) return 'text-yellow-500 border-yellow-500/30 bg-yellow-500/10 shadow-[0_0_10px_rgba(234,179,8,0.2)]';
+    return 'text-red-500 border-red-600/30 bg-red-600/10 animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.3)]';
   };
 
   const handleResetOnboarding = async (id: string, email: string) => {
@@ -76,8 +101,8 @@ export default function FleetDirectory() {
         />
       </div>
 
-      {/* IDENTITY DIRECTORY */}
-      <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[600px] pr-2 scrollbar-hide pb-10">
+      {/* IDENTITY DIRECTORY - TRUTH: Fixed scrolling by removing max-h limit */}
+      <div className="grid grid-cols-1 gap-3 pb-10">
         {filteredMembers.map((member) => (
           <div 
             key={member.id} 
@@ -108,7 +133,17 @@ export default function FleetDirectory() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {/* PHASE 4.7: LIVE SIGNAL BADGE */}
+                {liveSignals[member.id] !== undefined && (
+                  <div className={`px-2 py-1 rounded-lg border flex items-center gap-1.5 transition-all animate-in zoom-in-95 ${getSignalColor(liveSignals[member.id])}`}>
+                    <Activity size={10} className="animate-pulse" />
+                    <span className="text-[9px] font-black tabular-nums tracking-tighter">
+                      {liveSignals[member.id]} <span className="text-[7px]">dBm</span>
+                    </span>
+                  </div>
+                )}
+                
                 <span className="text-[10px] font-black text-purple-400 tabular-nums bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
                   {member.project_count} Missions
                 </span>

@@ -9,7 +9,7 @@ export function getMetricValue(measurement: Measurement, metric: MetricType): nu
 }
 
 /**
- * TRUTH ULTRA-SMOOTH COLOR ENGINE
+ * TRUTH ULTRA-SMOOTH COLOR ENGINE (FROZEN ZONE)
  * 14-Tier granularity to ensure "cloud" transitions instead of sharp bands.
  */
 export function getIBwaveColor(value: number): string {
@@ -120,48 +120,71 @@ export async function exportToPDF(measurements: Measurement[], projectName: stri
   return doc.output('blob');
 }
 
+/**
+ * TRUTH: HARDENED DONOR EXPORT ENGINE
+ */
 export async function exportInstallPDF(photos: InstallPhoto[], projectName: string) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const blueColor = [39, 170, 225];
+
+  // PAGE 1: EXECUTIVE SUMMARY
   drawGFCHeader(doc, 'Donor Azimuth Report', projectName);
+  
   const summaryData = photos.map((p, i) => [
-    i + 1, p.label || 'Unknown', `${p.azimuth.toString().padStart(3, '0')}°`, `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`
+    i + 1, 
+    p.label || 'Unknown Asset', 
+    `${(p.azimuth || 0).toString().padStart(3, '0')}°`, 
+    `${(p.latitude || 0).toFixed(6)}, ${(p.longitude || 0).toFixed(6)}`
   ]);
+
   autoTable(doc, {
     startY: 50,
-    head: [['#', 'Asset Designation', 'Azimuth', 'GPS Location']],
+    head: [['#', 'Asset Designation', 'Verified Azimuth', 'GPS Coordinates']],
     body: summaryData,
     theme: 'striped',
     headStyles: { fillColor: [15, 23, 42], textColor: 255 },
     styles: { fontSize: 8 }
   });
+
+  // SUBSEQUENT PAGES: INDIVIDUAL ANTENNA VERIFICATION
   for (const photo of photos) {
     doc.addPage();
-    const base64Image = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(photo.imageBlob);
-    });
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${photo.label || 'Donor Antenna'} Alignment`, 15, 20);
-    doc.addImage(base64Image, 'JPEG', 15, 30, 180, 0);
+    drawGFCHeader(doc, 'Antenna Verification Log', projectName);
+
+    let base64Image: string = '';
+    try {
+      if (typeof photo.imageBlob === 'string' && photo.imageBlob.startsWith('data:')) {
+        base64Image = photo.imageBlob;
+      } else {
+        base64Image = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(photo.imageBlob);
+        });
+      }
+      doc.addImage(base64Image, 'JPEG', 15, 55, 180, 120); 
+    } catch (e) {
+      doc.setTextColor(255, 0, 0);
+      doc.text('IMAGE UPLINK ERROR', 15, 60);
+    }
+
     autoTable(doc, {
-      startY: 180,
-      head: [['System Property', 'Verified Field Data']],
+      startY: 185,
+      head: [['Field Property', 'Verified Data Entry']],
       body: [
-        ['Antenna Label', photo.label || 'Unknown'],
-        ['Recorded Azimuth', `${photo.azimuth.toString().padStart(3, '0')}°`],
-        ['GPS Latitude', photo.latitude.toFixed(6)],
-        ['GPS Longitude', photo.longitude.toFixed(6)],
-        ['Verification Status', 'Field Validated']
+        ['Hardware Label', photo.label || 'Antenna Node'],
+        ['Recorded Azimuth', `${(photo.azimuth || 0).toString().padStart(3, '0')}°`],
+        ['Latitude', (photo.latitude || 0).toFixed(7)],
+        ['Longitude', (photo.longitude || 0).toFixed(7)],
+        ['Status', 'Field Authenticated']
       ],
       theme: 'grid',
-      headStyles: { fillColor: blueColor, textColor: 255 },
+      headStyles: { fillColor: [15, 23, 42], textColor: 255 },
       styles: { fontSize: 9 }
     });
+
     const footerY = 285;
     try { doc.addImage(LOGO_BASE64, 'PNG', 15, footerY - 6, 8, 8); } catch (e) {}
     doc.setFontSize(9);
@@ -170,15 +193,20 @@ export async function exportInstallPDF(photos: InstallPhoto[], projectName: stri
     doc.text('GoFlex', 25, footerY);
     const textWidth = doc.getTextWidth('GoFlex');
     doc.setTextColor(51, 65, 85);
-    doc.text('Connect App', 25 + textWidth + 1, footerY);
+    doc.text('Connect', 25 + textWidth + 1, footerY);
+    
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 116, 139);
-    doc.text('www.goflexconnect.com', pageWidth - 15, footerY, { align: 'right' });
+    doc.text('Automated Verification Report', pageWidth - 15, footerY, { align: 'right' });
   }
+
   return doc.output('blob');
 }
 
+/**
+ * HEATMAP SNAPSHOT ENGINE (FROZEN ZONE)
+ */
 export async function generateMapSnapshot(floorPlanUrl: string, measurements: Measurement[], benchmarkMode: boolean = false, rsrpTarget: number = -100): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();

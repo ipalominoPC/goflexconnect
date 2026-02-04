@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, MessageSquare, RefreshCw, Zap, Clock, User, ChevronRight, AlertCircle, ExternalLink, Send, CheckCircle2, Loader2, CheckSquare, X, ShieldAlert, Bot, FileText } from 'lucide-react';
-import { getAllTickets, updateTicketStatus, addAdminReply, createRemediationQuote, AdminTicketListItem } from '../../services/adminSupportService';
+import { Search, MessageSquare, RefreshCw, Zap, Clock, User, ChevronRight, AlertCircle, ExternalLink, Send, CheckCircle2, Loader2, CheckSquare, X, ShieldAlert, Bot, FileText, UserCircle } from 'lucide-react';
+import { getAllTickets, updateTicketStatus, addAdminReply, createRemediationQuote, getChatTranscript, AdminTicketListItem, AuditMessage } from '../../services/adminSupportService';
 
 export default function AdminSupportInbox({ onViewProject }: { onViewProject?: (id: string) => void }) {
   const [tickets, setTickets] = useState<AdminTicketListItem[]>([]);
@@ -15,6 +15,8 @@ export default function AdminSupportInbox({ onViewProject }: { onViewProject?: (
   // AUDIT & RESOLVE STATE
   const [confirmResolve, setConfirmResolve] = useState<string | null>(null);
   const [activeAudit, setActiveAudit] = useState<AdminTicketListItem | null>(null);
+  const [auditTranscript, setAuditTranscript] = useState<AuditMessage[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string | 'all'>('all');
@@ -51,6 +53,20 @@ export default function AdminSupportInbox({ onViewProject }: { onViewProject?: (
       console.error('[AdminSupport] Load failed:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenAudit = async (ticket: AdminTicketListItem) => {
+    if (!ticket.conversation_id) return;
+    setActiveAudit(ticket);
+    setLoadingAudit(true);
+    try {
+      const transcript = await getChatTranscript(ticket.conversation_id);
+      setAuditTranscript(transcript);
+    } catch (e) {
+      console.error('[Truth] Audit fetch failed', e);
+    } finally {
+      setLoadingAudit(false);
     }
   };
 
@@ -201,7 +217,7 @@ export default function AdminSupportInbox({ onViewProject }: { onViewProject?: (
                   {/* TASK 1: Intelligence Audit Button */}
                   {ticket.conversation_id && (
                     <button 
-                      onClick={() => setActiveAudit(ticket)}
+                      onClick={() => handleOpenAudit(ticket)}
                       className="p-2 bg-purple-500/10 border border-purple-500/30 rounded-lg text-purple-400 hover:bg-purple-500/20 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
                       title="Intelligence Audit"
                     >
@@ -252,7 +268,7 @@ export default function AdminSupportInbox({ onViewProject }: { onViewProject?: (
         ))}
       </div>
 
-      {/* INTELLIGENCE AUDIT OVERLAY (TASK 1) */}
+      {/* INTELLIGENCE AUDIT OVERLAY (TASK 1 - REAL-TIME) */}
       {activeAudit && (
         <div className="fixed inset-0 z-[10005] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-in fade-in">
            <div className="w-full max-w-lg bg-[#0A0F1A] border-2 border-purple-500/30 rounded-[2rem] overflow-hidden flex flex-col shadow-[0_0_50px_rgba(168,85,247,0.2)] animate-in zoom-in-95">
@@ -264,24 +280,43 @@ export default function AdminSupportInbox({ onViewProject }: { onViewProject?: (
                        <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Ref: {activeAudit.conversation_id}</p>
                     </div>
                  </div>
-                 <button onClick={() => setActiveAudit(null)} className="p-2 text-slate-500 hover:text-white transition-colors"><X size={20}/></button>
+                 <button onClick={() => { setActiveAudit(null); setAuditTranscript([]); }} className="p-2 text-slate-500 hover:text-white transition-colors"><X size={20}/></button>
               </div>
-              <div className="p-6 h-[400px] overflow-y-auto space-y-4">
-                 <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                    <p className="text-[9px] font-black text-purple-400 uppercase mb-2">Internal AI Reasoning</p>
-                    <p className="text-[11px] text-slate-300 leading-relaxed font-mono italic">
-                       &gt; Analyzing RSRP data: Node detected at -112dBm. Triggering high-priority remediation protocol. Hardware mismatch likely. Suggesting immediate site sweep...
-                    </p>
-                 </div>
-                 <div className="p-4 bg-purple-500/10 rounded-2xl border border-purple-500/20">
-                    <p className="text-[9px] font-black text-white uppercase mb-2">Transcript Summary</p>
-                    <p className="text-[11px] text-slate-300 leading-relaxed">
-                       The technician reported a "Signal Critical" event. The AI analyzed the heatmap v3 output and confirmed a coverage gap. A remediation ticket was automatically generated with priority 'REMEDIATION'.
-                    </p>
-                 </div>
+              
+              <div className="p-6 h-[450px] overflow-y-auto space-y-4 scrollbar-hide">
+                 {loadingAudit ? (
+                   <div className="h-full flex flex-col items-center justify-center gap-4">
+                      <Loader2 className="animate-spin text-purple-500" size={32} />
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Decrypting Field Logs...</p>
+                   </div>
+                 ) : auditTranscript.length > 0 ? (
+                   auditTranscript.map((msg) => (
+                    <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        <div className={`flex items-center gap-2 mb-1.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                           {msg.role === 'assistant' ? <Bot size={10} className="text-purple-400" /> : <UserCircle size={10} className="text-slate-500" />}
+                           <span className="text-[8px] font-black uppercase tracking-tighter text-slate-600">
+                             {msg.role === 'assistant' ? 'Flux Engine' : (activeAudit.user_email?.split('@')[0] || 'Tech')}
+                           </span>
+                        </div>
+                        <div className={`max-w-[90%] p-4 rounded-2xl border text-[11px] leading-relaxed ${
+                          msg.role === 'assistant' 
+                          ? 'bg-purple-500/5 border-purple-500/20 text-slate-300 italic' 
+                          : 'bg-white/5 border-white/5 text-white font-medium'
+                        }`}>
+                          {msg.content}
+                        </div>
+                    </div>
+                   ))
+                 ) : (
+                   <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                      <ShieldAlert size={40} className="mb-4 text-slate-600" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">No Transcript Ledger Found</p>
+                   </div>
+                 )}
               </div>
+              
               <div className="p-6 bg-black/40 border-t border-white/5 flex justify-end">
-                 <button onClick={() => setActiveAudit(null)} className="px-6 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">Close Audit</button>
+                 <button onClick={() => { setActiveAudit(null); setAuditTranscript([]); }} className="px-6 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Close Audit</button>
               </div>
            </div>
         </div>

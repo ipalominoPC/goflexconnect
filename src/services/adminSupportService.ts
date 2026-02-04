@@ -1,5 +1,5 @@
 /**
- * Admin Support Service (v4.5 Truth Edition)
+ * Admin Support Service (v4.6 Truth Edition)
  * 
  * Synchronized with Supabase Schema:
  * id, user_id, user_email, subject, status, priority, message, project_id, admin_reply, ticket_number, conversation_id
@@ -20,6 +20,14 @@ export interface AdminTicketListItem {
   project_id: string | null;
   admin_reply: string | null;
   conversation_id: string | null; // TASK 1: For Intelligence Audit (Transcript Linking)
+}
+
+// TASK 1: Interface for Intelligence Audit Logs
+export interface AuditMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
 }
 
 /**
@@ -56,6 +64,25 @@ export async function getAllTickets(): Promise<AdminTicketListItem[]> {
   } catch (err) {
     console.error('[AdminSupportService] Global fetch failed:', err);
     throw err;
+  }
+}
+
+/**
+ * TASK 1: Fetch Real-Time Chat Transcript for Intelligence Audit
+ */
+export async function getChatTranscript(conversationId: string): Promise<AuditMessage[]> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('id, role, content, created_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return (data as AuditMessage[]) || [];
+  } catch (err) {
+    console.error('[AdminSupportService] Transcript fetch failed:', err);
+    return [];
   }
 }
 

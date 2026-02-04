@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { getCellularSignal } from '../../services/cellularSignalService';
 import { getAssistantResponse } from '../../services/assistantService';
 import { generateUUID } from '../../utils/uuid'; 
+import { supabase } from '../../services/supabaseClient'; // SURGICAL ADDITION
 import './FlexBot.css';
 
 export default function FlexBot() {
@@ -29,19 +30,24 @@ export default function FlexBot() {
     }
   }, [messages, isOpen, status]);
 
-  const selectProtocol = (role: UserRole) => {
+  const selectProtocol = async (role: UserRole) => {
     setUserRole(role);
     setIsInitialized(true);
     
-    // TRUTH v4.6: Dynamic Date Injection in Greeting
-    // This anchors the AI's temporal awareness from the first message.
     const today = new Date().toLocaleDateString('en-US', { 
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
     });
 
-    setMessages([{ 
-      role: 'assistant', 
-      content: `Hi, I'm Flux. Today is ${today}. Secure link established for ${activeProject?.name || 'this mission'}. How shall we proceed with your RF strategy?` 
+    const greeting = `Hi, I'm Flux. Today is ${today}. Secure link established for ${activeProject?.name || 'this mission'}. How shall we proceed with your RF strategy?`;
+
+    setMessages([{ role: 'assistant', content: greeting }]);
+
+    // TASK 1: Persist initial greeting for HQ Audit
+    await supabase.from('chat_messages').insert([{
+      conversation_id: conversationId,
+      user_id: user?.id,
+      role: 'assistant',
+      content: greeting
     }]);
   };
 
@@ -51,10 +57,15 @@ export default function FlexBot() {
     // ANTI-NASTY SHIELD
     const nastyWords = ['fuck', 'shit', 'asshole', 'bitch'];
     if (nastyWords.some(word => input.toLowerCase().includes(word))) {
-      setMessages(prev => [...prev, { role: 'user', content: input }, { 
-        role: 'assistant', 
-        content: "My apologies, I am designed for professional RF consultation only. For further assistance, please contact our human engineering team at support@goflexconnect.com." 
-      }]);
+      const shieldMsg = "My apologies, I am designed for professional RF consultation only. For further assistance, please contact our human engineering team at support@goflexconnect.com.";
+      setMessages(prev => [...prev, { role: 'user', content: input }, { role: 'assistant', content: shieldMsg }]);
+      
+      // Persist shield event
+      await supabase.from('chat_messages').insert([
+        { conversation_id: conversationId, user_id: user?.id, role: 'user', content: input },
+        { conversation_id: conversationId, user_id: user?.id, role: 'assistant', content: shieldMsg }
+      ]);
+      
       setInput('');
       return;
     }
@@ -86,7 +97,24 @@ export default function FlexBot() {
     setInput('');
     setStatus('thinking');
 
+    // TASK 1: Persist user message immediately
+    supabase.from('chat_messages').insert([{
+      conversation_id: conversationId,
+      user_id: user?.id,
+      role: 'user',
+      content: input
+    }]).then();
+
     const botReply = await getAssistantResponse([...messages, userMsg], telemetryContext);
+    
+    // TASK 1: Persist assistant response
+    await supabase.from('chat_messages').insert([{
+      conversation_id: conversationId,
+      user_id: user?.id,
+      role: 'assistant',
+      content: botReply
+    }]);
+
     setMessages(prev => [...prev, { role: 'assistant', content: botReply }]);
     setStatus('idle');
   };
