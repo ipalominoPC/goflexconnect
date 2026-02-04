@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, FileDown, ShieldCheck, ChevronRight, ImagePlus, Loader2, FileText, Flame, FileSpreadsheet, Cloud, Plus, Trash2, AlertTriangle, X, Signal, Hammer, ClipboardCheck, Compass, FileSearch, Zap, ShieldAlert, CheckCircle2, CloudOff } from 'lucide-react';
+import { ArrowLeft, FileDown, ShieldCheck, ChevronRight, ImagePlus, Loader2, FileText, Flame, FileSpreadsheet, Cloud, Plus, Trash2, AlertTriangle, X, Signal, Hammer, ClipboardCheck, Compass, FileSearch, Zap, ShieldAlert, CheckCircle2, CloudOff, BarChart3 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { exportToPDF, exportToCSV, generateMapSnapshot, exportInstallPDF } from '../utils/calculations';
 import { Share } from '@capacitor/share';
@@ -10,7 +10,7 @@ import { db } from '../services/installDatabase';
 import DonorAntennaAzimuth from './DonorAntennaAzimuth';
 
 export default function ProjectDetail({ projectId, onBack, onStartSurvey, onViewHeatmap }: any) {
-  const { projects, setProjects, floors, setFloors, addFloor, deleteFloor, measurements, settings, user, currentSignal } = useStore();
+  const { projects, setProjects, floors, setFloors, addFloor, deleteFloor, measurements, settings, user, currentSignal, userRole } = useStore();
   const [isExporting, setIsExporting] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -22,6 +22,9 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
   const [quoteSuccess, setQuoteSuccess] = useState(false);
+
+  // ROLE LOGIC
+  const isExecutive = userRole === 'Property Manager';
 
   // HQ INSTRUCTION STATE
   const [hqInstruction, setHqInstruction] = useState<string | null>(null);
@@ -40,6 +43,14 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
   const projectFloors = (floors || []).filter((f: any) => f.project_id === projectId || f.projectId === projectId);
   const siteMeasurements = (measurements || []).filter((m: any) => m.projectId === projectId);
   
+  // COMPLIANCE STATS for Executive Dashboard
+  const complianceStats = {
+    excellent: siteMeasurements.filter(m => m.rsrp >= -90).length,
+    good: siteMeasurements.filter(m => m.rsrp < -90 && m.rsrp >= -105).length,
+    poor: siteMeasurements.filter(m => m.rsrp < -105).length,
+    total: siteMeasurements.length
+  };
+
   // SALES LOGIC: Detector (History + Live Stream)
   const worstSiteRSRP = siteMeasurements.reduce((min, m) => Math.min(min, m.rsrp), 0);
   const worstLiveRSRP = currentSignal?.rsrp || 0;
@@ -77,10 +88,9 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
            try {
              await supabase.from('system_quotes').insert(item.quote);
              await supabase.from('support_tickets').insert(item.ticket);
-             // Clear this specific item from buffer
              const newBuffer = buffer.filter((b: any) => b.id !== item.id);
              localStorage.setItem('gfc_zap_buffer', JSON.stringify(newBuffer));
-           } catch (e) { break; } // Still offline, wait for next attempt
+           } catch (e) { break; } 
         }
       }
     }
@@ -128,21 +138,14 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
     };
 
     try {
-      // TRUTH: Attempt instant dual-uplink
       const { error: qErr } = await supabase.from('system_quotes').insert(quotePayload);
       const { error: tErr } = await supabase.from('support_tickets').insert(ticketPayload);
-
       if (qErr || tErr) throw new Error('Network Shield Active');
-
       setQuoteSuccess(true);
     } catch (err) { 
-      // PHASE 4.7: Buffer the Zap locally for later uplink
-      console.warn('[SalesEngine] Resilience Active: Buffering Zap locally.');
       const buffer = JSON.parse(localStorage.getItem('gfc_zap_buffer') || '[]');
       buffer.push({ id: crypto.randomUUID(), quote: quotePayload, ticket: ticketPayload });
       localStorage.setItem('gfc_zap_buffer', JSON.stringify(buffer));
-      
-      // Still show success to the tech, the system handles the rest
       setQuoteSuccess(true);
     } finally { 
       setIsSubmittingQuote(false); 
@@ -153,15 +156,7 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
   const confirmUpload = async (name: string) => {
     if (!namingModal.data || isSaving) return;
     setIsSaving(true); setUploading(true);
-    
-    const newFloor = { 
-      id: crypto.randomUUID(), 
-      project_id: projectId, 
-      name: name || 'Unnamed Floor', 
-      image_data: namingModal.data, 
-      created_at: new Date().toISOString() 
-    };
-
+    const newFloor = { id: crypto.randomUUID(), project_id: projectId, name: name || 'Unnamed Floor', image_data: namingModal.data, created_at: new Date().toISOString() };
     try {
       addFloor(newFloor);
       setSelectedFloorId(newFloor.id);
@@ -190,9 +185,7 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
         setDonorPhotos(await db.getProjectInstalls(projectId));
       }
       setDeleteModal({ show: false, id: '', name: '', type: 'floor' });
-    } catch (err) { 
-      console.error(err); 
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleExport = async (type: 'PDF' | 'CSV' | 'DONOR') => {
@@ -281,6 +274,30 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
           </div>
         )}
 
+        {/* COMPLIANCE SUMMARY HUD: EXECUTIVE ONLY */}
+        {isExecutive && siteMeasurements.length > 0 && (
+          <div className="w-full mb-8 p-6 bg-[#27AAE1]/5 border border-[#27AAE1]/30 rounded-[2rem] shadow-2xl animate-in fade-in slide-in-from-top-4">
+             <div className="flex items-center gap-3 mb-6">
+                <BarChart3 className="text-[#27AAE1]" size={20} />
+                <p className="text-[10px] font-black text-white uppercase tracking-widest">Site Compliance Breakdown</p>
+             </div>
+             <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                   <p className="text-xl font-black text-green-500 leading-none">{complianceStats.excellent}</p>
+                   <p className="text-[7px] font-bold text-slate-500 uppercase mt-1">Excellent</p>
+                </div>
+                <div className="text-center border-x border-white/5">
+                   <p className="text-xl font-black text-yellow-500 leading-none">{complianceStats.good}</p>
+                   <p className="text-[7px] font-bold text-slate-500 uppercase mt-1">Acceptable</p>
+                </div>
+                <div className="text-center">
+                   <p className="text-xl font-black text-red-500 leading-none">{complianceStats.poor}</p>
+                   <p className="text-[7px] font-bold text-slate-500 uppercase mt-1">Critical</p>
+                </div>
+             </div>
+          </div>
+        )}
+
         {hasPoorSignal && (
           <button 
             onClick={() => setShowQuoteModal(true)}
@@ -306,28 +323,31 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
           </div>
           <h1 className="text-3xl font-black italic text-white leading-none tracking-tight">GoFlexConnect</h1>
           <p className="text-xs font-bold text-[#27AAE1] tracking-widest uppercase mt-3">{project?.name}</p>
-          <div className={`mt-2 px-3 py-1 rounded-full ${typeConfig.bg} border ${typeConfig.border}`}>
-             <span className={`text-[8px] font-black uppercase tracking-widest ${typeConfig.color}`}>{typeConfig.label}</span>
-          </div>
           
-          <button 
-            onClick={() => setShowTypeModal(true)} 
-            className="mt-6 px-6 py-3 bg-red-600/10 border-2 border-red-600 rounded-2xl flex items-center gap-3 animate-[high-intensity-red-pulse_2s_infinite] active:scale-95 transition-all shadow-lg"
-          >
-             <AlertTriangle size={16} className="text-red-500" />
-             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-500">Change Project Type</span>
-             <ChevronRight size={14} className="text-red-500/50" />
-          </button>
+          {/* TECHNICAL CONTROLS: Hide for Executives */}
+          {!isExecutive && (
+            <>
+              <div className={`mt-2 px-3 py-1 rounded-full ${typeConfig.bg} border ${typeConfig.border}`}>
+                 <span className={`text-[8px] font-black uppercase tracking-widest ${typeConfig.color}`}>{typeConfig.label}</span>
+              </div>
+              
+              <button 
+                onClick={() => setShowTypeModal(true)} 
+                className="mt-6 px-6 py-3 bg-red-600/10 border-2 border-red-600 rounded-2xl flex items-center gap-3 animate-[high-intensity-red-pulse_2s_infinite] active:scale-95 transition-all shadow-lg"
+              >
+                 <AlertTriangle size={16} className="text-red-500" />
+                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-500">Change Project Type</span>
+                 <ChevronRight size={14} className="text-red-500/50" />
+              </button>
+            </>
+          )}
         </div>
 
         {projectFloors.length === 0 && !uploading ? (
-          <button onClick={() => fileInputRef.current?.click()} className="w-full py-16 border-2 border-dashed border-[#27AAE1]/20 rounded-[2.5rem] bg-[#27AAE1]/5 flex flex-col items-center gap-4 shadow-xl active:bg-[#27AAE1]/10 transition-all">
-            <ImagePlus size={40} className="text-[#27AAE1]" />
-            <div className="text-center px-6">
-              <p className="text-lg font-black text-white leading-tight">Upload Initial Floor Plan</p>
-              <p className="text-[10px] font-bold text-[#27AAE1] uppercase tracking-widest mt-2">Required for field mission</p>
-            </div>
-          </button>
+          <div className="py-20 text-center opacity-40">
+             <ImagePlus size={48} className="mx-auto text-slate-700 mb-4" />
+             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">No Floor Assets Loaded</p>
+          </div>
         ) : (
           <div className="space-y-8">
             <div className="space-y-3 text-center">
@@ -339,20 +359,29 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
                     <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent" />
                     <div className="absolute bottom-5 left-6 right-6 flex items-end justify-between">
                        <div className="text-left"><p className="text-2xl font-black italic text-white leading-none">{activeFloor?.name}</p><p className="text-[10px] font-bold text-[#27AAE1] uppercase mt-2 tracking-widest">Locked & Ready</p></div>
-                       {isNative && (
-                         <button onClick={() => onStartSurvey(activeFloor.id)} className="bg-[#27AAE1] text-black px-6 py-4 rounded-2xl font-black text-xs uppercase shadow-xl active:scale-90 transition-all flex flex-col items-center gap-1.5">
-                           <div className="flex items-end gap-1 h-3"><div className="w-1 h-full bg-black/40 rounded-full animate-[bar-pulse_2s_infinite_0.1s]" /><div className="w-1 h-full bg-black/40 rounded-full animate-[bar-pulse_2s_infinite_0.3s]" /><div className="w-1 h-full bg-black/40 rounded-full animate-[bar-pulse_2s_infinite_0.5s]" /></div>
-                           Start Survey
-                         </button>
+                       
+                       {/* BIFURCATED ACTION BUTTON */}
+                       {isExecutive ? (
+                          <button onClick={onViewHeatmap} className="bg-[#27AAE1] text-black px-6 py-4 rounded-2xl font-black text-xs uppercase shadow-xl active:scale-90 transition-all flex items-center gap-2">
+                            <Flame size={14} fill="black" /> View Heatmap
+                          </button>
+                       ) : (
+                          isNative && (
+                            <button onClick={() => onStartSurvey(activeFloor.id)} className="bg-[#27AAE1] text-black px-6 py-4 rounded-2xl font-black text-xs uppercase shadow-xl active:scale-90 transition-all flex flex-col items-center gap-1.5">
+                              <div className="flex items-end gap-1 h-3"><div className="w-1 h-full bg-black/40 rounded-full animate-[bar-pulse_2s_infinite_0.1s]" /><div className="w-1 h-full bg-black/40 rounded-full animate-[bar-pulse_2s_infinite_0.3s]" /><div className="w-1 h-full bg-black/40 rounded-full animate-[bar-pulse_2s_infinite_0.5s]" /></div>
+                              Start Survey
+                            </button>
+                          )
                        )}
                     </div>
                   </div>
                 </div>
-                {isNative && <button onClick={() => setDeleteModal({ show: true, id: activeFloor.id, name: activeFloor.name, type: 'floor' })} className="absolute top-4 right-4 p-3 bg-black/60 backdrop-blur-md rounded-full text-red-500 border border-red-500/20"><Trash2 size={20} /></button>}
+                {!isExecutive && isNative && <button onClick={() => setDeleteModal({ show: true, id: activeFloor.id, name: activeFloor.name, type: 'floor' })} className="absolute top-4 right-4 p-3 bg-black/60 backdrop-blur-md rounded-full text-red-500 border border-red-500/20"><Trash2 size={20} /></button>}
               </div>
             </div>
 
-            {donorPhotos.length > 0 && (
+            {/* DONOR PHOTOS: Hide for executives unless there's a specific need */}
+            {!isExecutive && donorPhotos.length > 0 && (
               <div className="space-y-4">
                 <p className="text-[10px] text-[#27AAE1] font-bold uppercase tracking-[0.5em] text-center italic">Donor Antenna Records</p>
                 <div className="flex gap-3 overflow-x-auto pb-4 px-2">
@@ -376,23 +405,26 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
                     <div className="w-12 h-12 bg-black rounded-xl overflow-hidden border border-white/10"><img src={floor.image_data} className="w-full h-full object-cover" /></div>
                     <div className="text-left"><p className="text-lg font-bold text-white/90 italic leading-none">{floor.name}</p><p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest mt-1">{selectedFloorId === floor.id ? 'Mission Locked' : 'Tap to Target'}</p></div>
                   </div>
-                  {selectedFloorId !== floor.id && <button onClick={(e) => { e.stopPropagation(); setDeleteModal({ show: true, id: floor.id, name: floor.name, type: 'floor' }); }} className="p-3 text-red-500/30 active:text-red-500"><Trash2 size={18} /></button>}
+                  {!isExecutive && selectedFloorId !== floor.id && <button onClick={(e) => { e.stopPropagation(); setDeleteModal({ show: true, id: floor.id, name: floor.name, type: 'floor' }); }} className="p-3 text-red-500/30 active:text-red-500"><Trash2 size={18} /></button>}
                 </div>
               ))}
-              {isNative && <button onClick={() => fileInputRef.current?.click()} className="w-full py-5 border border-dashed border-white/10 rounded-2xl flex items-center justify-center gap-3 bg-white/5 active:bg-white/10 mt-4">{uploading ? <Loader2 className="animate-spin text-[#27AAE1]" /> : <Plus size={18} className="text-[#27AAE1]" />}<span className="text-[10px] font-bold text-white uppercase tracking-widest">Add Additional Floor</span></button>}
+              {!isExecutive && isNative && <button onClick={() => fileInputRef.current?.click()} className="w-full py-5 border border-dashed border-white/10 rounded-2xl flex items-center justify-center gap-3 bg-white/5 active:bg-white/10 mt-4">{uploading ? <Loader2 className="animate-spin text-[#27AAE1]" /> : <Plus size={18} className="text-[#27AAE1]" />}<span className="text-[10px] font-bold text-white uppercase tracking-widest">Add Additional Floor</span></button>}
             </div>
 
             <div className="mt-12 space-y-4">
-              <button 
-                onClick={() => setShowAzimuthTool(true)} 
-                className="w-full py-7 bg-slate-900 border-2 border-[#27AAE1]/60 rounded-2xl flex items-center justify-center gap-6 shadow-xl animate-[azimuth-glow_3s_infinite] active:scale-95 transition-all"
-              >
-                <Compass className="w-7 h-7 text-[#27AAE1]" />
-                <div className="text-left">
-                  <p className="text-sm font-black uppercase text-white leading-none">Azimuth Tool</p>
-                  <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Donor Antenna Alignment</p>
-                </div>
-              </button>
+              {/* AZIMUTH TOOL: Hide for Executives */}
+              {!isExecutive && (
+                <button 
+                  onClick={() => setShowAzimuthTool(true)} 
+                  className="w-full py-7 bg-slate-900 border-2 border-[#27AAE1]/60 rounded-2xl flex items-center justify-center gap-6 shadow-xl animate-[azimuth-glow_3s_infinite] active:scale-95 transition-all"
+                >
+                  <Compass className="w-7 h-7 text-[#27AAE1]" />
+                  <div className="text-left">
+                    <p className="text-sm font-black uppercase text-white leading-none">Azimuth Tool</p>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">Donor Antenna Alignment</p>
+                  </div>
+                </button>
+              )}
 
               <button onClick={onViewHeatmap} className="w-full py-7 bg-slate-900 border border-white/10 rounded-2xl flex items-center justify-center gap-6 active:scale-95 transition-all shadow-xl">
                 <Flame className="w-7 h-7 text-orange-500" />
@@ -410,7 +442,7 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
                 {showExportOptions && (
                   <div className="absolute bottom-24 left-0 right-0 bg-slate-800 border border-white/10 rounded-3xl p-3 flex flex-col gap-2 z-[700] shadow-2xl">
                     <button onClick={() => handleExport('PDF')} className="flex items-center justify-between p-5 bg-black/60 rounded-2xl hover:bg-[#27AAE1]/20 transition-all group"><span className="font-black text-xs uppercase text-white">Premium PDF Report</span><FileText className="text-red-500 group-hover:scale-110 transition-transform" /></button>
-                    {donorPhotos.length > 0 && (<button onClick={() => handleExport('DONOR')} className="flex items-center justify-between p-5 bg-black/60 border border-[#27AAE1]/30 rounded-2xl hover:bg-[#27AAE1]/20 transition-all group"><span className="font-black text-xs uppercase text-[#27AAE1]">Donor Azimuth Report</span><FileSearch className="text-[#27AAE1] group-hover:scale-110 transition-transform" /></button>)}
+                    {!isExecutive && donorPhotos.length > 0 && (<button onClick={() => handleExport('DONOR')} className="flex items-center justify-between p-5 bg-black/60 border border-[#27AAE1]/30 rounded-2xl hover:bg-[#27AAE1]/20 transition-all group"><span className="font-black text-xs uppercase text-[#27AAE1]">Donor Azimuth Report</span><FileSearch className="text-[#27AAE1] group-hover:scale-110 transition-transform" /></button>)}
                     <button onClick={() => handleExport('CSV')} className="flex items-center justify-between p-5 bg-black/60 rounded-2xl hover:bg-[#27AAE1]/20 transition-all group"><span className="font-black text-xs uppercase text-white">Data CSV Export</span><FileSpreadsheet className="text-green-500 group-hover:scale-110 transition-transform" /></button>
                   </div>
                 )}
