@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Lock, Eye, EyeOff, Loader2, User, Building2, Phone, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, User, Building2, Phone, ShieldCheck, Briefcase } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { useStore } from '../store/useStore';
 
@@ -17,6 +17,7 @@ export default function Auth({ onAuthSuccess, initialMode = 'login' }: AuthProps
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [role, setRole] = useState('Field Tech'); // PHASE 5.0 ROLE BINDING
 
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
@@ -44,6 +45,9 @@ export default function Auth({ onAuthSuccess, initialMode = 'login' }: AuthProps
               full_name: fullName,
               company_name: companyName,
               phone_number: phoneNumber,
+              role: role, // TASK 5.0: Bind Persona
+              billing_tier: 'trial', // Start on Trial Tier
+              is_comped: false       // Default paid status
             },
           },
         });
@@ -76,7 +80,7 @@ export default function Auth({ onAuthSuccess, initialMode = 'login' }: AuthProps
       {/* VERSION VERIFIER TAG */}
       <div className="absolute top-12 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#27AAE1]/10 border border-[#27AAE1]/30 rounded-full flex items-center gap-2">
          <ShieldCheck size={10} className="text-[#27AAE1]" />
-         <span className="text-[8px] font-black text-[#27AAE1] uppercase tracking-widest">Identity Protocol v1.0</span>
+         <span className="text-[8px] font-black text-[#27AAE1] uppercase tracking-widest">Identity Protocol v1.1</span>
       </div>
 
       <div className="w-full max-w-md mt-10">
@@ -106,19 +110,33 @@ export default function Auth({ onAuthSuccess, initialMode = 'login' }: AuthProps
 
         <form onSubmit={handleAuth} className="space-y-4">
           
-          {/* FIELDS ONLY APPEAR IN SIGN-UP MODE */}
           {isSignUp && (
             <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                 <input
                   type="text"
-                  className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 focus:ring-[#27AAE1] transition-all text-white placeholder:text-slate-700"
+                  className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 focus:ring-[#27AAE1] transition-all text-white placeholder:text-slate-700 font-bold"
                   placeholder="Full Name (Mandatory)"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required
                 />
+              </div>
+
+              {/* PHASE 5.0: PERSONA SELECTOR */}
+              <div className="relative">
+                <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#27AAE1]" />
+                <select
+                  className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 focus:ring-[#27AAE1] transition-all text-white appearance-none font-bold"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                >
+                  <option value="Field Tech" className="bg-slate-900">Lens: Field Tech</option>
+                  <option value="IT Department" className="bg-slate-900">Lens: IT Department</option>
+                  <option value="Property Manager" className="bg-slate-900">Lens: Property Manager</option>
+                  <option value="End User" className="bg-slate-900">Lens: End User</option>
+                </select>
               </div>
 
               <div className="relative">
