@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, FileDown, ShieldCheck, ChevronRight, ImagePlus, Loader2, FileText, Flame, FileSpreadsheet, Cloud, Plus, Trash2, AlertTriangle, X, Signal, Hammer, ClipboardCheck, Compass, FileSearch, Zap, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, FileDown, ShieldCheck, ChevronRight, ImagePlus, Loader2, FileText, Flame, FileSpreadsheet, Cloud, Plus, Trash2, AlertTriangle, X, Signal, Hammer, ClipboardCheck, Compass, FileSearch, Zap, ShieldAlert, CheckCircle2, CloudOff } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { exportToPDF, exportToCSV, generateMapSnapshot, exportInstallPDF } from '../utils/calculations';
 import { Share } from '@capacitor/share';
@@ -69,6 +69,20 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
       if (ticketData && ticketData.length > 0) {
         setHqInstruction(ticketData[0].admin_reply);
       }
+
+      // PHASE 4.7: Recover buffered "Zaps" from sub-basement
+      const buffer = JSON.parse(localStorage.getItem('gfc_zap_buffer') || '[]');
+      if (buffer.length > 0) {
+        for (const item of buffer) {
+           try {
+             await supabase.from('system_quotes').insert(item.quote);
+             await supabase.from('support_tickets').insert(item.ticket);
+             // Clear this specific item from buffer
+             const newBuffer = buffer.filter((b: any) => b.id !== item.id);
+             localStorage.setItem('gfc_zap_buffer', JSON.stringify(newBuffer));
+           } catch (e) { break; } // Still offline, wait for next attempt
+        }
+      }
     }
     if (projectId) syncData();
   }, [projectId, showAzimuthTool]);
@@ -98,37 +112,41 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
     if (!project) return;
     setIsSubmittingQuote(true);
     
-    // Determine context for tech notes
     const worstM = siteMeasurements.reduce((prev, curr) => (curr.rsrp < prev.rsrp ? curr : prev), siteMeasurements[0] || { rsrp: currentSignal?.rsrp || 0, carrierName: currentSignal?.carrier });
     const zapNotes = `AUTOMATED RF ALERT: Critical signal gap detected at ${project?.name}. Worst RSRP: ${worstM.rsrp}dBm. Site contains ${siteMeasurements.length} total samples. Requested by: ${user?.email || 'Field Tech'}.`;
 
-    try {
-      // 1. Sales Lead Entry
-      await supabase.from('system_quotes').insert({
-        project_id: projectId, 
-        user_id: user?.id,
-        tech_notes: zapNotes,
-        status: 'pending'
-      });
+    const quotePayload = { project_id: projectId, user_id: user?.id, tech_notes: zapNotes, status: 'pending' };
+    const ticketPayload = {
+      ticket_number: `REM-${Math.floor(1000 + Math.random() * 9000)}`,
+      priority: 'REMEDIATION',
+      subject: `Design Review: ${project?.name}`,
+      message: zapNotes,
+      status: 'new',
+      user_id: user?.id,
+      project_id: projectId,
+      user_email: user?.email
+    };
 
-      // 2. Support Ticket Entry (For Admin Dashboard)
-      await supabase.from('support_tickets').insert({
-        ticket_number: `REM-${Math.floor(1000 + Math.random() * 9000)}`,
-        priority: 'REMEDIATION',
-        subject: `Design Review: ${project?.name}`,
-        message: zapNotes,
-        status: 'new',
-        user_id: user?.id,
-        project_id: projectId,
-        user_email: user?.email
-      });
+    try {
+      // TRUTH: Attempt instant dual-uplink
+      const { error: qErr } = await supabase.from('system_quotes').insert(quotePayload);
+      const { error: tErr } = await supabase.from('support_tickets').insert(ticketPayload);
+
+      if (qErr || tErr) throw new Error('Network Shield Active');
 
       setQuoteSuccess(true);
-      setTimeout(() => { setShowQuoteModal(false); setQuoteSuccess(false); }, 2000);
     } catch (err) { 
-      console.error('[SalesEngine] Dual-Insert Failed:', err); 
+      // PHASE 4.7: Buffer the Zap locally for later uplink
+      console.warn('[SalesEngine] Resilience Active: Buffering Zap locally.');
+      const buffer = JSON.parse(localStorage.getItem('gfc_zap_buffer') || '[]');
+      buffer.push({ id: crypto.randomUUID(), quote: quotePayload, ticket: ticketPayload });
+      localStorage.setItem('gfc_zap_buffer', JSON.stringify(buffer));
+      
+      // Still show success to the tech, the system handles the rest
+      setQuoteSuccess(true);
     } finally { 
       setIsSubmittingQuote(false); 
+      setTimeout(() => { setShowQuoteModal(false); setQuoteSuccess(false); }, 2000);
     }
   };
 
@@ -145,21 +163,15 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
     };
 
     try {
-      // TRUTH: Optimistic Update (Instant UI response)
       addFloor(newFloor);
       setSelectedFloorId(newFloor.id);
       setNamingModal({ show: false, data: null });
       setCustomFloorName('');
-      
-      // Stop blocking spinner immediately
       setUploading(false);
       setIsSaving(false);
-
-      // Background DB Sync: Do not 'await' this for heavy assets to prevent UI lock
       supabase.from('floors').insert([newFloor]).then(({ error }) => {
         if (error) console.error('[Background Sync Fail]', error);
       });
-      
     } catch (err) { 
       console.error(err); 
       setUploading(false); 
@@ -170,17 +182,13 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
   const confirmPurge = async () => {
     try {
       const { id, type } = deleteModal;
-      
-      // Optimistic UI Removal
       if (type === 'floor') {
         deleteFloor(id);
-        // Background DB call
         supabase.from('floors').delete().eq('id', id).then();
       } else {
         await db.deleteInstall(id);
         setDonorPhotos(await db.getProjectInstalls(projectId));
       }
-      
       setDeleteModal({ show: false, id: '', name: '', type: 'floor' });
     } catch (err) { 
       console.error(err); 
@@ -258,7 +266,6 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
       </div>
 
       <div className="p-6">
-        {/* HQ TACTICAL INSTRUCTION HUD (NEW) */}
         {hqInstruction && (
           <div className="w-full mb-8 p-6 bg-[#27AAE1]/5 border-2 border-[#27AAE1]/40 rounded-[2rem] animate-[hq-glow_4s_infinite] shadow-2xl relative overflow-hidden">
              <div className="flex items-start gap-4 relative z-10">
@@ -267,17 +274,13 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
                </div>
                <div className="text-left">
                   <p className="text-[10px] font-black text-[#27AAE1] uppercase tracking-[0.4em] mb-1">HQ Engineering Directive</p>
-                  <p className="text-sm font-bold text-white leading-relaxed italic">
-                    "{hqInstruction}"
-                  </p>
+                  <p className="text-sm font-bold text-white leading-relaxed italic">"{hqInstruction}"</p>
                </div>
              </div>
-             {/* Subtle scanline effect */}
              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#27AAE1]/5 to-transparent -translate-x-full animate-[shimmer_3s_infinite]" />
           </div>
         )}
 
-        {/* INCOGNITO SALES HOOK */}
         {hasPoorSignal && (
           <button 
             onClick={() => setShowQuoteModal(true)}
@@ -436,7 +439,6 @@ export default function ProjectDetail({ projectId, onBack, onStartSurvey, onView
         </div>
       )}
 
-      {/* REMAINDER OF MODALS PRESERVED */}
       {showTypeModal && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => setShowTypeModal(false)} />

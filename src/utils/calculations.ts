@@ -10,7 +10,6 @@ export function getMetricValue(measurement: Measurement, metric: MetricType): nu
 
 /**
  * TRUTH ULTRA-SMOOTH COLOR ENGINE (FROZEN ZONE)
- * 14-Tier granularity to ensure "cloud" transitions instead of sharp bands.
  */
 export function getIBwaveColor(value: number): string {
   // POOR / CRITICAL (RED SPECTRUM)
@@ -35,7 +34,38 @@ export function getIBwaveColor(value: number): string {
 }
 
 /**
- * Legacy Color Mapping (Maintained for non-heatmap UI consistency)
+ * PHASE 4.8: COMPLIANCE LEGEND UTILITY
+ */
+const drawRSRPScale = (doc: jsPDF, y: number) => {
+  const startX = 35;
+  const width = 140;
+  const height = 4;
+  const steps = 40; 
+  const stepWidth = width / steps;
+
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Signal Intensity Reference (RSRP dBm)', startX + (width / 2), y - 3, { align: 'center' });
+
+  for (let i = 0; i <= steps; i++) {
+    const val = -115 + (i * (45 / steps));
+    const color = getIBwaveColor(val);
+    const rgb = color.match(/\d+/g)!.map(Number);
+    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+    doc.rect(startX + (i * stepWidth), y, stepWidth, height, 'F');
+  }
+
+  doc.setFont('helvetica', 'normal');
+  doc.text('-115', startX, y + height + 4);
+  doc.text('-105', startX + (width * (10 / 45)), y + height + 4, { align: 'center' });
+  doc.text('-95', startX + (width * (20 / 45)), y + height + 4, { align: 'center' });
+  doc.text('-85', startX + (width * (30 / 45)), y + height + 4, { align: 'center' });
+  doc.text('Excellent', startX + width, y + height + 4, { align: 'right' });
+};
+
+/**
+ * Legacy Color Mapping
  */
 export function getColorForValue(value: number, metric: MetricType, thresholds: ThresholdConfig, benchmarkMode: boolean = false, rsrpTarget: number = -100): string {
   if (benchmarkMode && metric === 'rsrp') {
@@ -100,11 +130,13 @@ const drawGFCHeader = (doc: jsPDF, title: string, projectName: string) => {
 export async function exportToPDF(measurements: Measurement[], projectName: string, mapImage?: string | null, benchmarkMode: boolean = false, rsrpTarget: number = -100) {
   const doc = new jsPDF();
   drawGFCHeader(doc, benchmarkMode ? `Compliance Report (Target: ${rsrpTarget}dBm)` : 'Pro Site Report', projectName);
+  
   const tableData = measurements.map((m: any, index) => [
     index + 1, m.carrierName || 'T-Mobile', m.techType || 'LTE',
     m.rsrp + ' dBm', m.rsrq + ' dB', m.sinr + ' dB',
     m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : 'N/A'
   ]);
+
   autoTable(doc, {
     startY: 50,
     head: [['#', 'Carrier', 'Tech', 'RSRP', 'RSRQ', 'SINR', 'Time']],
@@ -113,9 +145,12 @@ export async function exportToPDF(measurements: Measurement[], projectName: stri
     headStyles: { fillColor: [15, 23, 42], textColor: 255 },
     styles: { fontSize: 7 }
   });
+
   if (mapImage) {
     doc.addPage();
-    doc.addImage(mapImage, 'JPEG', 15, 20, 180, 0);
+    drawGFCHeader(doc, 'RF Heatmap Simulation', projectName);
+    doc.addImage(mapImage, 'JPEG', 15, 55, 180, 0);
+    drawRSRPScale(doc, 265); // Inject Legend at Bottom
   }
   return doc.output('blob');
 }
@@ -128,7 +163,6 @@ export async function exportInstallPDF(photos: InstallPhoto[], projectName: stri
   const pageWidth = doc.internal.pageSize.getWidth();
   const blueColor = [39, 170, 225];
 
-  // PAGE 1: EXECUTIVE SUMMARY
   drawGFCHeader(doc, 'Donor Azimuth Report', projectName);
   
   const summaryData = photos.map((p, i) => [
@@ -147,7 +181,6 @@ export async function exportInstallPDF(photos: InstallPhoto[], projectName: stri
     styles: { fontSize: 8 }
   });
 
-  // SUBSEQUENT PAGES: INDIVIDUAL ANTENNA VERIFICATION
   for (const photo of photos) {
     doc.addPage();
     drawGFCHeader(doc, 'Antenna Verification Log', projectName);
