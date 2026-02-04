@@ -194,5 +194,3 @@ export default function ProjectList({ onSelectProject, onBack }: any) {
     </div>
   );
 }
-
-npm run build; npx cap sync android; cd android; ./gradlew assembleDebug; cd ..; git add .; git commit -m "🚀 PHASE 5.0: Nexus Executive Portfolio List & Health Index"; git push origin main; & "C:\Users\GFC\AppData\Local\Android\Sdk\platform-tools\adb.exe" install -r android/app/build/outputs/apk/debug/app-debug.apk
