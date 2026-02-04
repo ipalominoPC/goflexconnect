@@ -1,7 +1,14 @@
 import { supabase } from './supabaseClient';
 import { offlineStorage } from './offlineStorage';
-import { buildAnalytics } from '../utils/analyticsBuilder';
 import { useStore } from '../store/useStore';
+
+// PHASE 4.9: Hierarchy integrity priorities
+const SYNC_PRIORITY: Record<string, number> = {
+  'project': 0,
+  'floor': 1,
+  'measurement': 2,
+  'speedTest': 3
+};
 
 class SyncService {
   private syncInProgress = false;
@@ -43,9 +50,15 @@ class SyncService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
       const pendingItems = await offlineStorage.getPendingSyncItems();
+      
+      // TRUTH: Enforce dependency order (Project -> Floor -> Measurement)
+      const sortedItems = [...pendingItems].sort((a, b) => 
+        (SYNC_PRIORITY[a.type] ?? 99) - (SYNC_PRIORITY[b.type] ?? 99)
+      );
 
-      for (const item of pendingItems) {
+      for (const item of sortedItems) {
         try {
           if (item.type === 'project') {
             await this.syncProject(item, user.id);
@@ -57,10 +70,16 @@ class SyncService {
             await this.syncSpeedTest(item, user.id);
           }
           await offlineStorage.removeSyncItem(item.id);
-        } catch (err) { console.error('Item sync failed:', err); }
+        } catch (err) { 
+          console.error(`[SyncService] Reconciliation failure for ${item.type}:`, err);
+          // TRUTH: Leave in queue for next handshake if dependency isn't met
+        }
       }
-    } catch (error) { console.error('Sync error:', error);
-    } finally { this.syncInProgress = false; }
+    } catch (error) { 
+      console.error('Sync error:', error);
+    } finally { 
+      this.syncInProgress = false; 
+    }
   }
 
   private async syncProject(item: any, userId: string) {
@@ -93,6 +112,7 @@ class SyncService {
       x: d.x, y: d.y, location_number: d.locationNumber,
       rsrp: d.rsrp, rsrq: d.rsrq, sinr: d.sinr, rssi: d.rssi,
       cell_id: d.cellId || 'Unknown', tech_type: d.techType,
+      carrier_name: d.carrierName || 'Unknown', // Phase 4.9: Standardized key mapping
       latitude: d.latitude || null, longitude: d.longitude || null, band: d.band || null,
       timestamp: new Date(d.timestamp).toISOString()
     }, { onConflict: 'id' });
@@ -114,7 +134,7 @@ class SyncService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Load projects
+      // PHASE 4.9: Recursive Reconciliation Handshake
       const { data: projects } = await supabase.from('projects').select('*').eq('user_id', user.id);
       if (projects) {
         useStore.getState().setProjects(projects.map(p => ({
@@ -124,7 +144,6 @@ class SyncService {
         })));
       }
 
-      // Load floors
       const { data: floors } = await supabase.from('floors').select('*').eq('user_id', user.id);
       if (floors) {
         useStore.getState().setFloors(floors.map(f => ({
@@ -134,7 +153,6 @@ class SyncService {
         })));
       }
 
-      // Load measurements
       const { data: measurements } = await supabase.from('measurements').select('*').eq('user_id', user.id);
       if (measurements) {
         useStore.getState().setMeasurements(measurements.map(m => ({
@@ -147,10 +165,14 @@ class SyncService {
         })));
       }
 
-      console.log('[SyncService] Loaded from server:', { projects: projects?.length, floors: floors?.length, measurements: measurements?.length });
-    } catch (error) { console.error('Load error:', error); }
+      console.log('[SyncService] Handshake Complete:', { 
+        projects: projects?.length, 
+        floors: floors?.length, 
+        measurements: measurements?.length 
+      });
+    } catch (error) { 
+      console.error('Handshake error:', error); 
+    }
   }
 }
 export const syncService = new SyncService();
-
-
