@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Layers, Info } from 'lucide-react';
+import { ArrowLeft, Layers, Info, Activity } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getMetricValue, getIBwaveColor } from '../utils/calculations';
 import { MetricType } from '../types';
@@ -30,7 +30,7 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
     // 2. PHASE 4.7: REFINED THERMAL PARAMETERS
     const radius = 300; 
     const gridSize = 4; 
-    const sigma = radius / 2.0; // TRUTH: Wider sigma for IBwave-grade transitions
+    const sigma = radius / 2.0; 
 
     // 3. GENERATE RAW DATA GRID
     for (let x = 0; x < canvas.width; x += gridSize) {
@@ -45,7 +45,6 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
           const distSq = dx * dx + dy * dy;
 
           if (distSq < radius * radius) {
-            // GAUSSIAN RBF KERNEL
             const weight = Math.exp(-distSq / (2 * sigma * sigma));
             weightedSum += getMetricValue(m, 'rsrp') * weight;
             totalWeight += weight;
@@ -56,7 +55,6 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
         if (foundAny && totalWeight > 0.001) {
           const val = weightedSum / totalWeight;
           ctx.fillStyle = getIBwaveColor(val);
-          // TRUTH: Enhanced edge transparency for natural thermal bleed
           ctx.globalAlpha = Math.min(totalWeight * 0.9, 1.0);
           ctx.fillRect(x, y, gridSize, gridSize);
         }
@@ -69,7 +67,6 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
     tempCanvas.height = canvas.height;
     const tempCtx = tempCanvas.getContext('2d')!;
     
-    // TRUTH: Deep feathering (20px) + Saturation boost for S24 display intensity
     tempCtx.filter = 'blur(20px) contrast(1.1) saturate(1.2)'; 
     tempCtx.drawImage(canvas, 0, 0);
     
@@ -97,6 +94,34 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
       </div>
 
       <div className="flex-1 relative bg-[#0D0F11]">
+        {/* PHASE 4.8: COMPLIANCE LEGEND HUD */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[1010] flex flex-col items-center gap-2">
+           <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl flex flex-col items-center gap-4">
+              <div className="flex flex-col gap-1 items-center">
+                 <p className="text-[7px] font-black text-[#27AAE1] uppercase tracking-tighter mb-1">dBm</p>
+                 <div className="w-2.5 h-32 rounded-full overflow-hidden flex flex-col-reverse border border-white/5 bg-black">
+                    {/* Visual representation of the scale */}
+                    {Array.from({ length: 10 }).map((_, i) => (
+                       <div 
+                         key={i} 
+                         className="flex-1 w-full" 
+                         style={{ backgroundColor: getIBwaveColor(-115 + (i * 5)) }} 
+                       />
+                    ))}
+                 </div>
+              </div>
+              <div className="flex flex-col gap-5 text-[8px] font-black tabular-nums text-slate-400 uppercase">
+                 <span className="text-green-500">-70</span>
+                 <span className="text-yellow-500">-95</span>
+                 <span className="text-orange-500">-105</span>
+                 <span className="text-red-500">-115</span>
+              </div>
+           </div>
+           <div className="bg-[#27AAE1]/10 backdrop-blur-md border border-[#27AAE1]/30 rounded-xl p-2 shadow-lg">
+              <Activity size={12} className="text-[#27AAE1] animate-pulse" />
+           </div>
+        </div>
+
         <ZoomableFloorPlan floorPlanImage={mapImage}>
            <div className="absolute inset-0 pointer-events-none" style={{ mixBlendMode: 'multiply', opacity: viewMode === 'heatmap' ? 0.9 : 0, transition: 'opacity 0.4s ease' }}>
              <canvas ref={canvasRef} width={1000} height={1000} className="w-full h-full" />
@@ -112,7 +137,7 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
         </ZoomableFloorPlan>
       </div>
 
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 bg-black/80 backdrop-blur-xl border border-[#27AAE1]/30 rounded-full shadow-2xl flex items-center gap-3">
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 bg-black/80 backdrop-blur-xl border border-[#27AAE1]/30 rounded-full shadow-2xl flex items-center gap-3 z-[1010]">
         <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
         <span className="text-[10px] font-black text-white uppercase tracking-widest italic">iBwave Mesh v3.1 Active</span>
       </div>
