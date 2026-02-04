@@ -1,7 +1,8 @@
 ﻿import { useState, useRef } from 'react';
-import { ArrowLeft, User, Lock, Shield, LogOut, Download, Eye, EyeOff, Settings as SettingsIcon, Globe, Beaker, Gauge, X, LayoutDashboard, Activity } from 'lucide-react';
+import { ArrowLeft, User, Lock, Shield, LogOut, Download, Eye, EyeOff, Settings as SettingsIcon, Globe, Beaker, Gauge, X, LayoutDashboard, Activity, RefreshCw, Database, CheckCircle2, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../services/supabaseClient';
+import { syncService } from '../services/syncService';
 
 interface SettingsProps {
   onBack: () => void;
@@ -18,6 +19,10 @@ export default function Settings({ onBack, onShowDiagnostics, onNavigateToAdmin 
   const [showAdminModal, setShowAdminModal] = useState(false);
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // PHASE 4.9: RECONCILIATION STATE
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncComplete, setSyncComplete] = useState(false);
+
   const handleLongPressStart = () => {
     if (!user || user.app_metadata?.role !== 'admin') return;
     pressTimer.current = setTimeout(() => setShowAdminModal(true), 3000);
@@ -33,6 +38,23 @@ export default function Settings({ onBack, onShowDiagnostics, onNavigateToAdmin 
       setMessage('Security Vault Updated');
       setNewPassword('');
     } catch (e) { setMessage('Update failed'); } finally { setLoading(false); }
+  };
+
+  const handleMasterReconciliation = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncComplete(false);
+    try {
+      // TRUTH: Force bi-directional integrity check
+      await syncService.syncWithServer(); // Push local buffer
+      await syncService.loadDataFromServer(); // Pull latest from HQ
+      setSyncComplete(true);
+      setTimeout(() => setSyncComplete(false), 3000);
+    } catch (e) {
+      console.error('[Integrity] Sync failed', e);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -54,6 +76,41 @@ export default function Settings({ onBack, onShowDiagnostics, onNavigateToAdmin 
               {user?.app_metadata?.role === 'admin' && <span className="text-[8px] bg-[#27AAE1] text-white px-2 py-0.5 rounded font-black mt-1 inline-block uppercase">System Admin</span>}
             </div>
           </div>
+        </div>
+
+        {/* MISSION DATA RECONCILIATION (PHASE 4.9) */}
+        <div className="bg-slate-900/50 rounded-2xl p-6 border border-[#27AAE1]/20 shadow-[0_0_20px_rgba(39,170,225,0.05)]">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-[#27AAE1]/10 rounded-xl border border-[#27AAE1]/20">
+              <RefreshCw className={`w-6 h-6 text-[#27AAE1] ${isSyncing ? 'animate-spin' : ''}`} />
+            </div>
+            <div>
+              <p className="text-[10px] text-[#27AAE1] font-black uppercase tracking-[0.2em]">Data Integrity</p>
+              <p className="text-sm font-bold">Master Reconciliation</p>
+            </div>
+          </div>
+          
+          <p className="text-[10px] text-slate-500 font-medium mb-6 leading-relaxed italic">
+            Synchronize local cache with HQ servers. Use this to resolve data drift or force mission uploads.
+          </p>
+
+          <button
+            onClick={handleMasterReconciliation}
+            disabled={isSyncing}
+            className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all ${
+              syncComplete 
+              ? 'bg-green-500/20 border border-green-500/50 text-green-500' 
+              : 'bg-[#27AAE1] text-black shadow-lg active:scale-95 disabled:opacity-50'
+            }`}
+          >
+            {isSyncing ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Uplinking...</>
+            ) : syncComplete ? (
+              <><CheckCircle2 className="w-4 h-4" /> Integrity Verified</>
+            ) : (
+              <><Database className="w-4 h-4" /> Trigger Handshake</>
+            )}
+          </button>
         </div>
 
         {/* SECURITY VAULT */}
