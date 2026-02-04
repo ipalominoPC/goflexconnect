@@ -27,10 +27,10 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
     // 1. CLEAR CANVAS
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 2. TRUTH CLOUD PARAMETERS
-    const radius = 320; 
-    const gridSize = 4; // Grid for logic, Blur will hide the squares
-    const sigma = radius / 2.5; // Gaussian standard deviation
+    // 2. PHASE 4.7: REFINED THERMAL PARAMETERS
+    const radius = 300; 
+    const gridSize = 4; 
+    const sigma = radius / 2.0; // TRUTH: Wider sigma for IBwave-grade transitions
 
     // 3. GENERATE RAW DATA GRID
     for (let x = 0; x < canvas.width; x += gridSize) {
@@ -45,7 +45,7 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
           const distSq = dx * dx + dy * dy;
 
           if (distSq < radius * radius) {
-            // GAUSSIAN WEIGHT: This creates the "Cloud" distribution
+            // GAUSSIAN RBF KERNEL
             const weight = Math.exp(-distSq / (2 * sigma * sigma));
             weightedSum += getMetricValue(m, 'rsrp') * weight;
             totalWeight += weight;
@@ -56,21 +56,21 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
         if (foundAny && totalWeight > 0.001) {
           const val = weightedSum / totalWeight;
           ctx.fillStyle = getIBwaveColor(val);
-          // Opacity fade at the edges of the cloud
-          ctx.globalAlpha = Math.min(totalWeight * 0.8, 0.9);
+          // TRUTH: Enhanced edge transparency for natural thermal bleed
+          ctx.globalAlpha = Math.min(totalWeight * 0.9, 1.0);
           ctx.fillRect(x, y, gridSize, gridSize);
         }
       }
     }
 
-    // 4. THE iBWAVE SECRET SAUCE: MULTI-PASS SMOOTHING
-    // This removes the "Lines" and "Squares" and turns them into clouds.
+    // 4. THE iBWAVE SECRET SAUCE: MULTI-PASS ENHANCED SMOOTHING
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = canvas.width;
     tempCanvas.height = canvas.height;
     const tempCtx = tempCanvas.getContext('2d')!;
     
-    tempCtx.filter = 'blur(12px) contrast(1.1)'; // Heavy feathering
+    // TRUTH: Deep feathering (20px) + Saturation boost for S24 display intensity
+    tempCtx.filter = 'blur(20px) contrast(1.1) saturate(1.2)'; 
     tempCtx.drawImage(canvas, 0, 0);
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -114,7 +114,7 @@ export default function HeatmapView({ projectId, floorId, onBack }: any) {
 
       <div className="absolute bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 bg-black/80 backdrop-blur-xl border border-[#27AAE1]/30 rounded-full shadow-2xl flex items-center gap-3">
         <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
-        <span className="text-[10px] font-black text-white uppercase tracking-widest italic">iBwave Mesh v3.0 Active</span>
+        <span className="text-[10px] font-black text-white uppercase tracking-widest italic">iBwave Mesh v3.1 Active</span>
       </div>
     </div>
   );
