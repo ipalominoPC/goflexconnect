@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Plus, Folder, ChevronRight, ArrowLeft, RefreshCw, Layout, X, Loader2, Signal, Hammer, ClipboardCheck, Zap } from 'lucide-react';
+import { Plus, Folder, ChevronRight, ArrowLeft, RefreshCw, Layout, X, Loader2, Signal, Hammer, ClipboardCheck, Zap, ShieldCheck, Activity } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../services/supabaseClient';
 
 export default function ProjectList({ onSelectProject, onBack }: any) {
-  const { projects, setProjects, user, addProject } = useStore();
+  const { projects, setProjects, user, addProject, userRole, measurements } = useStore();
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
   const [projectType, setProjectType] = useState<'survey' | 'install' | 'service'>('survey');
   const [isCreating, setIsCreating] = useState(false);
+
+  const isExecutive = userRole === 'Property Manager';
 
   // HQ NOTIFICATION STATE
   const [projectsWithInstructions, setProjectsWithInstructions] = useState<string[]>([]);
@@ -39,6 +41,14 @@ export default function ProjectList({ onSelectProject, onBack }: any) {
 
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  // PHASE 5.0: BUILDING HEALTH ENGINE
+  const calculateHealthScore = (projectId: string) => {
+    const siteMs = measurements.filter(m => m.projectId === projectId);
+    if (siteMs.length === 0) return null;
+    const compliant = siteMs.filter(m => m.rsrp > -105).length;
+    return Math.round((compliant / siteMs.length) * 100);
+  };
 
   const handleCreate = async () => {
     if (!newSiteName.trim() || !user) return;
@@ -75,28 +85,34 @@ export default function ProjectList({ onSelectProject, onBack }: any) {
           <img src="/icons/logo-128.png" className="w-14 h-14 rounded-xl border border-[#27AAE1]/30 shadow-[0_0_25px_rgba(39,170,225,0.3)]" />
           <div>
             <h1 className="text-2xl font-black italic">GoFlexConnect</h1>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.5em]">Command Center</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.5em]">
+              {isExecutive ? 'Portfolio Overview' : 'Command Center'}
+            </p>
           </div>
         </div>
       </div>
 
       <div className="p-6 mt-52">
-        <button onClick={() => setShowModal(true)} className="w-full bg-slate-900/40 border border-white/10 rounded-[1.8rem] p-7 flex items-center justify-between shadow-2xl active:border-[#27AAE1]/50 transition-all mb-10">
-          <div className="flex items-center gap-5">
-            <div className="p-4 bg-[#27AAE1]/5 rounded-2xl border border-[#27AAE1]/20 shadow-[0_0_15px_rgba(39,170,225,0.1)]">
-              <Plus size={28} className="text-[#27AAE1]" strokeWidth={3} />
+        {/* EXECUTIVE HUD: Hide creation tools for Property Managers */}
+        {!isExecutive && (
+          <button onClick={() => setShowModal(true)} className="w-full bg-slate-900/40 border border-white/10 rounded-[1.8rem] p-7 flex items-center justify-between shadow-2xl active:border-[#27AAE1]/50 transition-all mb-10">
+            <div className="flex items-center gap-5">
+              <div className="p-4 bg-[#27AAE1]/5 rounded-2xl border border-[#27AAE1]/20 shadow-[0_0_15px_rgba(39,170,225,0.1)]">
+                <Plus size={28} className="text-[#27AAE1]" strokeWidth={3} />
+              </div>
+              <div className="text-left">
+                <p className="text-xl font-bold text-white tracking-tight">Deploy New Site</p>
+                <p className="text-[10px] font-bold text-[#27AAE1] uppercase tracking-widest opacity-40">Initialize Mission</p>
+              </div>
             </div>
-            <div className="text-left">
-              <p className="text-xl font-bold text-white tracking-tight">Deploy New Site</p>
-              <p className="text-[10px] font-bold text-[#27AAE1] uppercase tracking-widest opacity-40">Initialize Mission</p>
-            </div>
-          </div>
-          <Layout size={20} className="text-slate-800" />
-        </button>
+            <Layout size={20} className="text-slate-800" />
+          </button>
+        )}
 
         <div className="space-y-5">
           {projects.map((project) => {
             const hasHqInstruction = projectsWithInstructions.includes(project.id);
+            const healthScore = calculateHealthScore(project.id);
             
             return (
               <button 
@@ -107,11 +123,22 @@ export default function ProjectList({ onSelectProject, onBack }: any) {
                 }`}
               >
                 <div className="flex items-center gap-6">
+                  {/* PHASE 5.0: NEXUS HEALTH RING vs FOLDER ICON */}
                   <div className={`w-14 h-14 bg-black rounded-xl flex items-center justify-center border transition-all ${
                     hasHqInstruction ? 'border-[#27AAE1] shadow-[0_0_35px_#27AAE1]' : 'border-[#27AAE1]/60 shadow-[0_0_35px_rgba(39,170,225,0.4)]'
                   }`}>
-                    <Folder size={24} className="text-[#27AAE1] drop-shadow-[0_0_22px_#27AAE1]" />
+                    {isExecutive && healthScore !== null ? (
+                      <div className="flex flex-col items-center">
+                        <span className={`text-[12px] font-black leading-none ${healthScore > 90 ? 'text-green-500' : healthScore > 75 ? 'text-yellow-500' : 'text-red-500'}`}>
+                          {healthScore}
+                        </span>
+                        <span className="text-[6px] font-bold text-slate-500 uppercase mt-0.5 tracking-tighter">Health</span>
+                      </div>
+                    ) : (
+                      <Folder size={24} className="text-[#27AAE1] drop-shadow-[0_0_22px_#27AAE1]" />
+                    )}
                   </div>
+
                   <div className="text-left">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-xl font-bold text-white tracking-tight">{project.name}</p>
@@ -124,7 +151,7 @@ export default function ProjectList({ onSelectProject, onBack }: any) {
                     </div>
                     <p className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${getStatusColor(project.type)}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                      {project.type || 'Survey'}
+                      {isExecutive ? 'Asset Authenticated' : (project.type || 'Survey')}
                     </p>
                   </div>
                 </div>
@@ -167,3 +194,5 @@ export default function ProjectList({ onSelectProject, onBack }: any) {
     </div>
   );
 }
+
+npm run build; npx cap sync android; cd android; ./gradlew assembleDebug; cd ..; git add .; git commit -m "🚀 PHASE 5.0: Nexus Executive Portfolio List & Health Index"; git push origin main; & "C:\Users\GFC\AppData\Local\Android\Sdk\platform-tools\adb.exe" install -r android/app/build/outputs/apk/debug/app-debug.apk
