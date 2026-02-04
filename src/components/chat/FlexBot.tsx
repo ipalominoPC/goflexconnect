@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, X, UserCircle, Briefcase, HelpCircle, Lock, ShieldCheck } from 'lucide-react';
+import { Send, X, UserCircle, Briefcase, HelpCircle, Lock, ShieldCheck, CloudOff } from 'lucide-react';
 import { useStore, UserRole } from '../../store/useStore';
 import { Capacitor } from '@capacitor/core';
 import { getCellularSignal } from '../../services/cellularSignalService';
 import { getAssistantResponse } from '../../services/assistantService';
 import { generateUUID } from '../../utils/uuid'; 
-import { supabase } from '../../services/supabaseClient'; // SURGICAL ADDITION
+import { supabase } from '../../services/supabaseClient';
 import './FlexBot.css';
 
 export default function FlexBot() {
@@ -18,15 +18,42 @@ export default function FlexBot() {
   const [conversationId, setConversationId] = useState<string>('');
   const [input, setInput] = useState('');
   const [status, setStatus] = useState<'idle' | 'thinking' | 'speaking'>('idle');
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isNative = Capacitor.isNativePlatform();
   const activeProject = projects.find(p => p.id === currentProjectId);
 
+  // PHASE 4.7: RESILIENCE BUFFER LOGIC
+  const persistToLedger = async (msg: any) => {
+    try {
+      const { error } = await supabase.from('chat_messages').insert([msg]);
+      if (error) throw error;
+      setIsOfflineMode(false);
+    } catch (e) {
+      setIsOfflineMode(true);
+      const buffer = JSON.parse(localStorage.getItem('gfc_chat_buffer') || '[]');
+      buffer.push({ ...msg, buffered_at: new Date().toISOString() });
+      localStorage.setItem('gfc_chat_buffer', JSON.stringify(buffer));
+      console.warn('[Flux Resilience] Sub-basement detected. Message buffered.');
+    }
+  };
+
   useEffect(() => { 
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       if (!conversationId) setConversationId(generateUUID());
+      
+      // Attempt to flush buffer on open
+      const buffer = JSON.parse(localStorage.getItem('gfc_chat_buffer') || '[]');
+      if (buffer.length > 0) {
+        Promise.all(buffer.map((msg: any) => supabase.from('chat_messages').insert([msg])))
+          .then(() => {
+            localStorage.removeItem('gfc_chat_buffer');
+            setIsOfflineMode(false);
+          })
+          .catch(() => setIsOfflineMode(true));
+      }
     }
   }, [messages, isOpen, status]);
 
@@ -39,32 +66,26 @@ export default function FlexBot() {
     });
 
     const greeting = `Hi, I'm Flux. Today is ${today}. Secure link established for ${activeProject?.name || 'this mission'}. How shall we proceed with your RF strategy?`;
-
     setMessages([{ role: 'assistant', content: greeting }]);
 
-    // TASK 1: Persist initial greeting for HQ Audit
-    await supabase.from('chat_messages').insert([{
+    await persistToLedger({
       conversation_id: conversationId,
       user_id: user?.id,
       role: 'assistant',
       content: greeting
-    }]);
+    });
   };
 
   const handleSend = async () => {
     if (!input.trim() || status === 'thinking') return;
     
-    // ANTI-NASTY SHIELD
     const nastyWords = ['fuck', 'shit', 'asshole', 'bitch'];
     if (nastyWords.some(word => input.toLowerCase().includes(word))) {
       const shieldMsg = "My apologies, I am designed for professional RF consultation only. For further assistance, please contact our human engineering team at support@goflexconnect.com.";
       setMessages(prev => [...prev, { role: 'user', content: input }, { role: 'assistant', content: shieldMsg }]);
       
-      // Persist shield event
-      await supabase.from('chat_messages').insert([
-        { conversation_id: conversationId, user_id: user?.id, role: 'user', content: input },
-        { conversation_id: conversationId, user_id: user?.id, role: 'assistant', content: shieldMsg }
-      ]);
+      await persistToLedger({ conversation_id: conversationId, user_id: user?.id, role: 'user', content: input });
+      await persistToLedger({ conversation_id: conversationId, user_id: user?.id, role: 'assistant', content: shieldMsg });
       
       setInput('');
       return;
@@ -97,23 +118,23 @@ export default function FlexBot() {
     setInput('');
     setStatus('thinking');
 
-    // TASK 1: Persist user message immediately
-    supabase.from('chat_messages').insert([{
+    // Resilient Uplink for User Message
+    persistToLedger({
       conversation_id: conversationId,
       user_id: user?.id,
       role: 'user',
       content: input
-    }]).then();
+    });
 
     const botReply = await getAssistantResponse([...messages, userMsg], telemetryContext);
     
-    // TASK 1: Persist assistant response
-    await supabase.from('chat_messages').insert([{
+    // Resilient Uplink for Bot Response
+    await persistToLedger({
       conversation_id: conversationId,
       user_id: user?.id,
       role: 'assistant',
       content: botReply
-    }]);
+    });
 
     setMessages(prev => [...prev, { role: 'assistant', content: botReply }]);
     setStatus('idle');
@@ -144,9 +165,12 @@ export default function FlexBot() {
                <div>
                 <p className="text-base font-black text-white italic leading-none flex items-center gap-1.5">
                     Flux 
-                    <span className="text-[8px] bg-[#27AAE1]/20 text-[#27AAE1] px-1 rounded font-bold">v4.6</span>
+                    <span className="text-[8px] bg-[#27AAE1]/20 text-[#27AAE1] px-1 rounded font-bold">v4.7</span>
                 </p>
-                <p className="text-[10px] text-[#27AAE1] font-black mt-1.5 uppercase tracking-widest">RF Intelligence</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <p className="text-[10px] text-[#27AAE1] font-black uppercase tracking-widest leading-none">Intelligence</p>
+                  {isOfflineMode && <div className="flex items-center gap-1 bg-orange-500/20 px-1 rounded"><CloudOff size={8} className="text-orange-500" /><span className="text-[7px] text-orange-500 font-bold uppercase">Buffered</span></div>}
+                </div>
                </div>
             </div>
             <button onClick={() => setIsOpen(false)} className="p-2 text-slate-500 hover:text-white transition-colors"><X size={20} /></button>
