@@ -139,7 +139,7 @@ export default function AdminDashboard({ onBack }: any) {
   };
 
   return (
-    <div className="min-h-screen bg-[#05070A] text-white font-sans flex flex-col selection:bg-[#27AAE1]/30">
+    <div className="min-h-screen bg-[#05070A] text-white font-sans flex flex-col selection:bg-[#27AAE1]/30 overflow-hidden">
       
       {/* NOTIFICATION HUD */}
       <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[5000] transition-all duration-500 transform ${notification.show ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0 pointer-events-none'}`}>
@@ -247,11 +247,11 @@ export default function AdminDashboard({ onBack }: any) {
              </button>
           </div>
 
-          {/* TAB CONTENT: Scrollable internally on Desktop, natural on mobile */}
-          <div className="flex-1 flex flex-col lg:overflow-y-auto scrollbar-hide">
+          {/* TAB CONTENT: Scrollable internally on Desktop, natural on mobile. TRUTH: Added safe pb-48 for web nav */}
+          <div className="flex-1 flex flex-col lg:overflow-y-auto scrollbar-hide min-h-0">
             {activeTab === 'remediation' && (
-              <div className="flex flex-col">
-                {/* GLOBAL BROADCAST HUB (NEW) */}
+              <div className="flex flex-col pb-48">
+                {/* GLOBAL BROADCAST HUB */}
                 <div className="p-6 border-b border-white/10 bg-[#27AAE1]/5">
                    <h3 className="text-[10px] font-black text-[#27AAE1] uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                       <Megaphone size={12} /> Fleet Broadcast Hub
@@ -313,20 +313,20 @@ export default function AdminDashboard({ onBack }: any) {
                       ))}
                    </div>
                 </div>
-                <div className="p-4 pb-20 lg:pb-4">
+                <div className="p-4">
                    <AdminSupportInbox key={refreshTrigger} onViewProject={(id) => setSelectedProjectId(id)} />
                 </div>
               </div>
             )}
             
             {activeTab === 'fleet' && (
-              <div className="p-6 pb-20 lg:pb-4">
+              <div className="p-6 pb-48">
                  <FleetDirectory />
               </div>
             )}
 
             {activeTab === 'vault' && (
-              <div className="p-6 pb-20 lg:pb-4">
+              <div className="p-6 pb-48">
                  <ProjectVault onSpectate={(id) => setSelectedProjectId(id)} />
               </div>
             )}
